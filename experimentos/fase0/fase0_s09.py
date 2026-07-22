@@ -47,6 +47,20 @@ PISO_CAP = 2.0 / 100     # piso de margen para capacidad (P1.1), en fracción
 PISO_T2  = 2.0 / 100
 
 
+def notify(text):
+    """Aviso opcional por Telegram. Token y chat SOLO por env (nunca en el repo público).
+    En Colab: %env TELEGRAM_TOKEN=...  %env TELEGRAM_CHAT=..."""
+    tok, chat = os.environ.get("TELEGRAM_TOKEN"), os.environ.get("TELEGRAM_CHAT")
+    if not (tok and chat):
+        return
+    try:
+        import urllib.request, urllib.parse
+        data = urllib.parse.urlencode({"chat_id": chat, "text": text}).encode()
+        urllib.request.urlopen(f"https://api.telegram.org/bot{tok}/sendMessage", data=data, timeout=15)
+    except Exception as e:
+        print("[notify] fallo Telegram:", e, flush=True)
+
+
 def device_info():
     d = jax.devices()[0]
     return {"platform": d.platform, "device_kind": getattr(d, "device_kind", str(d))}
@@ -82,6 +96,8 @@ def run_one(cond, seed):
         json.dump(out, f, indent=1)
     print(f"[done] {cond} seed{seed} · {out['wall_s']:.0f}s · L128 acc@1="
           f"{cap[128][1]:.3f} · T2={t2:.3f}", flush=True)
+    notify(f"✅ S0.9 · {cond} seed{seed} listo ({out['wall_s']:.0f}s)\n"
+           f"acc@1: L64={cap[64][1]:.3f} L96={cap[96][1]:.3f} L128={cap[128][1]:.3f} · T2={t2:.3f}")
     return out
 
 
@@ -134,10 +150,14 @@ def main():
     s07 = s07_determinism_check()
     with open(os.path.join(RESULTS, "s07_check.json"), "w") as f:
         json.dump({**s07, "device": device_info()}, f, indent=1)
+    notify(f"▶️ S0.9 campaña iniciada · {device_info()['device_kind']} · "
+           f"S0.7 determinismo max|Δ|={s07['max_abs_diff']:.1e} ({'OK' if s07['ok'] else 'REVISAR'})")
     for cond in CONDS:
         for seed in range(N_SEEDS):
             run_one(cond, seed)
     aggregate()
+    notify("🏁 S0.9 COMPLETA (C1+C2, todas las semillas). Márgenes y cargas de evaluación listos "
+           "en margenes_instanciados.md + s09_summary.json.")
 
 
 if __name__ == "__main__":
