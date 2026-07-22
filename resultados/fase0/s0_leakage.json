@@ -1,0 +1,12 @@
+{
+ "check": "leakage",
+ "kind": "softmax",
+ "L": 32,
+ "h": 8,
+ "acc_present": 0.9996744791666666,
+ "acc_absent": 0.015299479166666666,
+ "chance": 0.015625,
+ "conf_absent": 0.750218391418457,
+ "verdict": "SIN FUGA \u2713 (ausentes \u2248 azar)",
+ "wall_s": 461.8
+}

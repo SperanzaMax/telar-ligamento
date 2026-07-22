@@ -91,6 +91,25 @@ def eval_capacity(params, kind, loads, seed=1234, batch=64, reps=4, topk=(1, 4, 
     return out
 
 
+def eval_overwrite(params, kind, L=32, seed=4321, batch=64, reps=4):
+    """Correctabilidad (T2): acc@1 sobre las claves REASIGNADAS (responder el valor nuevo)."""
+    from datos import gen_overwrite
+    rng = np.random.default_rng(seed)
+    fwd = jax.jit(partial(forward, kind=kind))
+    accs = []
+    for _ in range(reps):
+        x, y, upd = gen_overwrite(rng, batch, L, r=L // 2)
+        t_max = 4 * L + 2
+        xp, yp = _pad_to(x, y, t_max)
+        um = np.zeros_like(yp, dtype=bool); um[:, -L:] = upd
+        logits = np.array(fwd(params, jnp.array(xp)))
+        pred = logits[..., V0:V0 + NV].argmax(-1)
+        true = np.where(yp >= 0, yp - V0, -1)
+        m = (yp >= 0) & um
+        accs.append(((pred == true) & m).sum() / max(m.sum(), 1))
+    return float(np.mean(accs))
+
+
 def smoke():
     """S0.1: softmax debe reproducir MQAR (>95% a L=8) y degradarse suavemente."""
     print("=== SMOKE S0.1 · softmax en T1 (arquitectura §5, vocab E-001) ===")

@@ -47,6 +47,35 @@ def gen_mqar(rng, B, L):
 
 
 # =====================================================================================
+# Control de fuga (S0 sanidad): query de clave cuyo par NUNCA se almacenó
+# =====================================================================================
+def gen_mqar_leakage(rng, B, L, h):
+    """Como T1 pero se ALMACENAN solo (L-h) pares; las queries incluyen h claves 'holdout' cuyo
+    par (k,v) nunca se presentó. El value target de esas queries existe pero el modelo no lo vio:
+    si acierta por encima del azar (1/NV), hay fuga (atajo posicional/espurio, no lookup real).
+    Devuelve (x, y, absent_mask) con absent_mask (B,L) True en las queries holdout."""
+    assert h < L <= NK
+    store = L - h
+    T = 2 * store + 2 + L
+    keys = np.argsort(rng.random((B, NK)), axis=1)[:, :L]      # L claves únicas
+    vals = rng.integers(0, NV, size=(B, L))
+    x = np.full((B, T), PAD, dtype=np.int32)
+    y = np.full((B, T), IGNORE, dtype=np.int32)
+    x[:, 0] = BOS
+    x[:, 1:2 * store + 1:2] = K0 + keys[:, :store]            # solo se almacenan los primeros `store`
+    x[:, 2:2 * store + 2:2] = V0 + vals[:, :store]
+    x[:, 2 * store + 1] = SEP
+    perm = np.argsort(rng.random((B, L)), axis=1)             # consulta las L claves, barajadas
+    qk = np.take_along_axis(keys, perm, axis=1)
+    qv = np.take_along_axis(vals, perm, axis=1)
+    x[:, 2 * store + 2:] = K0 + qk
+    y[:, 2 * store + 2:] = V0 + qv
+    is_absent = (np.arange(L)[None, :] >= store).repeat(B, 0)  # índices holdout = los últimos h
+    absent_mask = np.take_along_axis(is_absent, perm, axis=1)
+    return x, y, absent_mask
+
+
+# =====================================================================================
 # T2 — MQAR con sobreescritura (correctabilidad)
 # =====================================================================================
 def gen_overwrite(rng, B, L, r=None):
