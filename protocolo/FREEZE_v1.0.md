@@ -43,9 +43,15 @@ Cualquier cambio de diseño posterior es un protocolo **nuevo** (v2.0…), no un
 - Estas fechas preceden a cualquier corrida principal (Fase 0 aún no ejecutada) → el reclamo de pre-registro
   queda sin flanco: el diseño estaba fijado y públicamente fechado antes de ver un solo resultado.
 
-### DOI de Zenodo (pendiente)
-- Slot reservado. Cuando salga el DOI, se registra acá. **NO re-hashear ni editar el protocolo** al depositar
-  en Zenodo — el hash y el tag ya anclan la versión; Zenodo solo agrega un identificador citable.
+### DOI de Zenodo — REGISTRADO 2026-07-22
+- **DOI:** [10.5281/zenodo.21495252](https://doi.org/10.5281/zenodo.21495252)
+- **Record:** https://zenodo.org/records/21495252 (público, Open Access, licencia CC-BY-4.0)
+- **Tipo:** Publication / Working paper · **Versión:** 1.0 · **Publicado:** 2026-07-22
+- **Autor:** Speranza, Maximiliano Rodrigo (Independent Researcher)
+- **Archivo depositado:** `telar-ligamento-v1.0-freeze.zip` (snapshot del freeze; contiene `PROTOCOLO_v1.0.md`
+  con SHA-256 `2f8ebb82…` verificable). El protocolo **no se re-hasheó** al depositar: el hash y el tag git
+  anclan la versión; Zenodo solo agrega el identificador citable. (El zip depositado es anterior a esta línea
+  del companion, por construcción — un archivo no puede contener el DOI que se genera al publicarlo.)
 
 ## Regla de oro post-freeze
 A partir de este archivo, **no se discute más diseño: se corre.** Orden: Fase 0 → E1 → E2 → E3 → E4.
