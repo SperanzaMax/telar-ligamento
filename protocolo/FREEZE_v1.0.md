@@ -31,9 +31,21 @@ Cualquier cambio de diseño posterior es un protocolo **nuevo** (v2.0…), no un
 
 ## Depósito
 - **Depósito local:** este repo, `telar-ligamento/protocolo/` (protocolo + companion versionados juntos).
-- **Depósito externo (pendiente de Maxi):** subir `PROTOCOLO_v1.0.md` + este companion a un timestamp
-  inmutable (Zenodo / OSF / git tag firmado) para anclar la fecha de pre-registro. Registrar acá el DOI/tag
-  cuando exista. NO re-hashear ni editar el protocolo al depositar.
+
+### Ancla pública de fecha (git tag firmado + GitHub) — REGISTRADO 2026-07-22
+- **Repositorio:** https://github.com/SperanzaMax/telar-ligamento (público)
+- **Commit del freeze:** `638cc89e9d6b099cd4634e87bb18fbdee66507da` (firmado, SSH ed25519, verificado `Good signature`)
+- **Tag firmado:** `ligamento-v1.0-freeze` → https://github.com/SperanzaMax/telar-ligamento/releases/tag/ligamento-v1.0-freeze
+- **Clave de firma:** ed25519 dedicada `telar_signing` (fingerprint `SHA256:ykmA9jBYXfxM5g7X8hyw29ZHp4mjbim+zbKYbEKX8OQ`, verificable vía `~/.config/git/allowed_signers`)
+- **Timestamps server-side (los pone GitHub, fuera del control del autor = inatacables):**
+  - repo `created_at`: `2026-07-22T13:48:33Z` · `pushed_at`: `2026-07-22T13:48:38Z`
+  - release `published_at`: `2026-07-22T13:49:05Z`
+- Estas fechas preceden a cualquier corrida principal (Fase 0 aún no ejecutada) → el reclamo de pre-registro
+  queda sin flanco: el diseño estaba fijado y públicamente fechado antes de ver un solo resultado.
+
+### DOI de Zenodo (pendiente)
+- Slot reservado. Cuando salga el DOI, se registra acá. **NO re-hashear ni editar el protocolo** al depositar
+  en Zenodo — el hash y el tag ya anclan la versión; Zenodo solo agrega un identificador citable.
 
 ## Regla de oro post-freeze
 A partir de este archivo, **no se discute más diseño: se corre.** Orden: Fase 0 → E1 → E2 → E3 → E4.
