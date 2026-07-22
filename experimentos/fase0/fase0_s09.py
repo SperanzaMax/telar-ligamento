@@ -32,7 +32,8 @@ from entrenar import train, eval_capacity, eval_overwrite
 from modelos import count_params, init_params, forward
 
 # --- configuración (env override) ---
-CONDS   = ["softmax", "delta"]                    # C1, C2
+# CONDS: subconjunto/orden de condiciones. Ej: CONDS=delta,softmax (delta primero) o CONDS=delta (solo).
+CONDS   = os.environ.get("CONDS", "softmax,delta").split(",")   # C1=softmax, C2=delta
 LOADS   = [8, 16, 32, 64, 96, 128]
 N_SEEDS = int(os.environ.get("N_SEEDS", 8))
 STEPS   = int(os.environ.get("STEPS", 2500))
