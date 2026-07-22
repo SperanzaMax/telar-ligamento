@@ -4,6 +4,22 @@ Cada entrada: fecha, motivo, alcance. Se registra **antes** de mirar los resulta
 
 ---
 
+## D-002 · 2026-07-22 · Presupuesto de parámetros por encima de lo declarado (observación, NO bloqueante)
+
+**Qué.** La arquitectura §5 tal como está especificada (d_model=64, H=4, 4 bloques, 4 proyecciones D×D
+por bloque, FFN hidden 192) produce un modelo softmax de **192 453 parámetros**, por encima del rango
+«≈100k–150k» declarado en §3/§5. Desglose: bloques ≈167 040 (4 × ~41 760) + vocab (E-001) 25 413.
+El grueso del exceso es la arquitectura misma (~167k sin vocab), no la enmienda E-001.
+
+**Estado:** ABIERTO como observación; **no bloquea nada, no se corrige** (la arquitectura está congelada).
+Es una inconsistencia pre-existente entre el presupuesto declarado y la arquitectura declarada, detectada al
+instanciar el modelo. **R2 (params ±5% ENTRE condiciones) no se ve afectado**: es un criterio relativo, y
+el embedding/FFN/proyecciones son comunes a C1..C4; la diferencia entre condiciones viene de las cabezas.
+El presupuesto absoluto es una guía de §3, no un criterio de veredicto. Se documenta para trazabilidad y para
+que el informe reporte el conteo real (S0.6 exige la tabla de params por condición de todos modos).
+
+---
+
 ## D-001 · 2026-07-22 · CONFLICTO DE ESPECIFICACIÓN (bloqueante de Fase 0, frenado por §0.5)
 
 **Estado:** **RESUELTO 2026-07-22 por la enmienda E-001 (opción a, ratificada por Maxi).** Ver
