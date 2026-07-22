@@ -91,6 +91,72 @@ def eval_capacity(params, kind, loads, seed=1234, batch=64, reps=4, topk=(1, 4, 
     return out
 
 
+def _val_acc(params, kind, val_loads=(64, 96, 128), seed=7777, batch=64, reps=2):
+    """Val-acc para el criterio de convergencia: media de acc@1 sobre las cargas discriminantes."""
+    cap = eval_capacity(params, kind, loads=list(val_loads), seed=seed, reps=reps, topk=(1,))
+    return float(np.mean([cap[L][1] for L in val_loads]))
+
+
+def train_resumable(cond, seed, target_steps, ckpt_path, max_load=128, lr=3e-3, batch=64,
+                    val_loads=(64, 96, 128), val_every=500, log_every=500):
+    """Entrena hasta target_steps reanudando desde ckpt_path si existe (params + opt_state + rng + step +
+    val_hist). Evalúa val-acc cada `val_every` pasos. Guarda checkpoint al terminar. Determinista por semilla:
+    train_resumable(...,N) == entrenar de corrido hasta N (mismos batches y estado). Devuelve (params, val_hist)."""
+    import pickle, os as _os
+    t_max = 4 * max_load + 2
+    sched = optax.warmup_constant_schedule(0.0, lr, 100)
+    opt = optax.chain(optax.clip_by_global_norm(1.0), optax.adamw(sched, weight_decay=0.01))
+
+    @partial(jax.jit, static_argnames='kind')
+    def train_step(params, state, x, y, kind):
+        (l, a), g = jax.value_and_grad(loss_fn, has_aux=True)(params, x, y, kind)
+        up, state = opt.update(g, state, params)
+        return optax.apply_updates(params, up), state, l, a
+
+    if _os.path.exists(ckpt_path):
+        with open(ckpt_path, "rb") as f:
+            ck = pickle.load(f)
+        params = jax.tree_util.tree_map(jnp.asarray, ck["params"])
+        state = jax.tree_util.tree_map(jnp.asarray, ck["opt_state"])
+        rng = np.random.default_rng(); rng.bit_generator.state = ck["rng_state"]
+        start, val_hist = ck["step"], ck["val_hist"]
+        if start >= target_steps:
+            return params, val_hist
+    else:
+        params = init_params(seed, cond)
+        state = opt.init(params)
+        rng = np.random.default_rng(seed)
+        start, val_hist = 0, []
+
+    t0 = time.time()
+    for s in range(start + 1, target_steps + 1):
+        if s % 2 == 0:
+            L = int(rng.integers(4, max_load + 1)); x, y, _ = gen_overwrite(rng, batch, L, r=max(1, L // 2))
+        else:
+            L = int(rng.integers(2, max_load + 1)); x, y = gen_mqar(rng, batch, L)
+        xp, yp = _pad_to(x, y, t_max)
+        params, state, l, a = train_step(params, state, jnp.array(xp), jnp.array(yp), cond)
+        if s % val_every == 0:
+            va = _val_acc(params, cond, val_loads=val_loads)
+            val_hist.append({"step": s, "val_acc": va})
+            print(f"[{cond} s{seed}] step {s:5d} val_acc {va:.4f} ({time.time()-t0:.0f}s)", flush=True)
+    # guardar checkpoint (numpy para portabilidad del pickle)
+    ck = {"params": jax.tree_util.tree_map(np.asarray, params),
+          "opt_state": jax.tree_util.tree_map(np.asarray, state),
+          "rng_state": rng.bit_generator.state, "step": target_steps, "val_hist": val_hist}
+    with open(ckpt_path, "wb") as f:
+        pickle.dump(ck, f)
+    return params, val_hist
+
+
+def converged(val_hist, target_steps, window=500, tol=0.005):
+    """Criterio D-004: mejora de val-acc < 0.5 pts en la ventana de los últimos `window` pasos, en target_steps."""
+    at = {h["step"]: h["val_acc"] for h in val_hist}
+    if target_steps not in at or (target_steps - window) not in at:
+        return None
+    return (at[target_steps] - at[target_steps - window]) < tol
+
+
 def eval_overwrite(params, kind, L=32, seed=4321, batch=64, reps=4):
     """Correctabilidad (T2): acc@1 sobre las claves REASIGNADAS (responder el valor nuevo)."""
     from datos import gen_overwrite

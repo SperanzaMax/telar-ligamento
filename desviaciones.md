@@ -4,6 +4,43 @@ Cada entrada: fecha, motivo, alcance. Se registra **antes** de mirar los resulta
 
 ---
 
+## D-003 · 2026-07-22 · R5 (early stopping) no implementado en la campaña S0.9 — pasos fijos
+
+**Qué.** El runner `fase0_s09.py` corrió con **STEPS=2500 fijos, sin el early stopping por validación** que
+manda R5 («paciencia 2000, tope 20 000»). Detectado al analizar la curva de entrenamiento de `delta_seed0`:
+train acc 0.8411 (step 2000) → 0.9353 (step 2500) — **delta aún subía fuerte, no convergió** a 2500. En cambio
+softmax converge holgado antes de 2500 (queda como está).
+
+**Consecuencia.** La eval por carga de delta a 2500 (L128 acc@1=0.755, carga de evaluación preliminar L96) es un
+**snapshot no convergido = lower bound de la capacidad de delta**. No interpretable como el plateau real ni como
+ancla del prereg C3-vs-C2.
+
+**Estado:** corregida por D-004. La foto a 2500 se conserva como snapshot documentado, no como resultado principal.
+
+## D-004 · 2026-07-22 · Corrección: extensión uniforme hasta convergencia (criterio explícito)
+
+**Fechada ANTES de mirar la eval por carga de las semillas extendidas** (requisito de §0.4).
+
+**Criterio de convergencia (pre-registrado acá):** una condición/semilla converge cuando la **mejora de accuracy
+de validación es < 0.5 puntos en la ventana de los últimos 500 pasos**. Val-acc = media de acc@1 sobre las cargas
+discriminantes {64, 96, 128} en un set de validación con semilla propia.
+
+**Procedimiento (uniforme, nunca por semilla individual):**
+1. Completar las 8 semillas de delta a 2500 (consistencia de la pasada actual). Softmax queda a 2500 (cumple el
+   criterio).
+2. Fase de extensión: reanudando desde checkpoints, en **bloques de +2500 pasos aplicados a TODAS las semillas de
+   delta por igual**, hasta que **todas** cumplan el criterio o se alcance el **tope duro de 10 000 pasos**.
+3. **Resultado principal = la tabla convergida** (todas al mismo N). La foto a 2500 = snapshot documentado.
+
+**Motivo.** El 0.755@L128 y la carga de evaluación del prereg C3-vs-C2 solo son interpretables anclados a números
+**convergidos**. Costo estimado: si delta converge ~5000 pasos, ~5 h más de T4 (una noche) contra el costo de que
+la primera tabla real de Ligamento nazca con un asterisco en su cifra más importante.
+
+**Para el futuro (fuera de esta corrección):** la restauración plena de R5 (early stopping con paciencia, tope
+10k) queda para E1 real y TELAR-03 Fase 2. Consenso de los tres.
+
+---
+
 ## D-002 · 2026-07-22 · Presupuesto de parámetros por encima de lo declarado (observación, NO bloqueante)
 
 **Qué.** La arquitectura §5 tal como está especificada (d_model=64, H=4, 4 bloques, 4 proyecciones D×D
