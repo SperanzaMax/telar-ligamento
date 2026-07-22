@@ -1,8 +1,10 @@
-# Pre-registro de SEGUIMIENTO — E1 · lectura de capacidad C3 vs. C2 (v0.1, BORRADOR)
+# Pre-registro de SEGUIMIENTO — E1 · lectura de capacidad C3 vs. C2 (v1.0, CONGELADO)
 
-**Estatus:** BORRADOR pre-registrado. El **timestamp del push a GitHub** (server-side) es el ancla: este
-documento se sube **antes** de mirar los datos de C2 (delta) a cargas nuevas que producirá el S0.9
-definitivo. Tras ratificación de Maxi se congela (hash) — igual que el protocolo madre.
+**Estatus:** **RATIFICADO por Maxi y CONGELADO 2026-07-22**, antes de correr una sola semilla de C2
+(delta). Hash SHA-256 y metadatos en el companion `FREEZE_PREREG_SEGUIMIENTO_v1.0.md`. Las predicciones
+PS-1/PS-2/PS-3 son **idénticas** a las del borrador v0.1 anclado con timestamp server-side de GitHub en el
+commit `8a6e690` (push 2026-07-22T19:08:03Z) — el único cambio de v0.1→v1.0 es este encabezado de estatus
+(verificable con `git diff`). Doble ancla: timestamp del borrador (antes de datos) + hash del congelado.
 
 **NO modifica el protocolo congelado v1.0** (`PROTOCOLO_v1.0.md`, SHA-256 `2f8ebb82…`, intacto). Es un
 protocolo **hermano de seguimiento**: promueve a predicción pre-registrada un análisis que en v1.0 vivía
