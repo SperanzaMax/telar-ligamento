@@ -1,0 +1,26 @@
+Creative Commons Attribution 4.0 International (CC-BY-4.0)
+SPDX-License-Identifier: CC-BY-4.0
+
+Copyright (c) 2026 Maximiliano Speranza
+
+This license applies to the experimental protocol and documentation in this
+repository: everything under `protocolo/`, this project's `README.md`, and any
+`docs`-style Markdown files describing the design, predictions, or findings.
+(Source code is licensed separately under the MIT License — see LICENSE.)
+
+You are free to share and adapt this material for any purpose, even
+commercially, under the following term:
+
+  Attribution — You must give appropriate credit to Maximiliano Speranza,
+  provide a link to this license, and indicate if changes were made. You may
+  do so in any reasonable manner, but not in any way that suggests the
+  licensor endorses you or your use.
+
+Suggested citation:
+  Speranza, M. (2026). «Ligamento» — Experimental protocol for
+  specialization vs. sharing in small-scale transformers (v1.0, pre-registered
+  and frozen). TELAR program. Frozen artifact SHA-256 recorded in
+  protocolo/FREEZE_v1.0.md.
+
+Full legal text: https://creativecommons.org/licenses/by/4.0/legalcode
+Human-readable summary: https://creativecommons.org/licenses/by/4.0/

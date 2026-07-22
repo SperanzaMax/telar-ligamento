@@ -1,0 +1,28 @@
+# --- Python / entorno ---
+__pycache__/
+*.py[cod]
+.venv/
+.venv-*/
+venv/
+*.egg-info/
+
+# --- Sistema ---
+.DS_Store
+Thumbs.db
+
+# --- Artefactos de corrida REGENERABLES y pesados ---
+# Se versionan: código, protocolo, docs, informes .md, JSON de resumen y
+# margenes_instanciados.md (evidencia del pre-registro, R11/R8).
+# Se ignoran: datasets, checkpoints y binarios grandes que se regeneran por semilla.
+data/
+datasets/
+*.npz
+*.npy
+*.ckpt
+*.pkl
+*.pt
+*.msgpack
+*.log
+
+# Figuras generadas: descomentar si se vuelven pesadas y se prefiere regenerarlas.
+# *.png
