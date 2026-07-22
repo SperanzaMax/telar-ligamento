@@ -53,6 +53,55 @@ Cualquier cambio de diseño posterior es un protocolo **nuevo** (v2.0…), no un
   anclan la versión; Zenodo solo agrega el identificador citable. (El zip depositado es anterior a esta línea
   del companion, por construcción — un archivo no puede contener el DOI que se genera al publicarlo.)
 
+## Enmiendas post-freeze (NO modifican el protocolo hasheado)
+
+Las enmiendas viven aquí y en `desviaciones.md`. El protocolo `PROTOCOLO_v1.0.md` **no se toca**: su
+SHA-256 `2f8ebb82…` sigue siendo el ancla. Una enmienda resuelve un defecto de especificación detectado
+en implementación; se registra con fecha, número, causa y resolución numérica, antes de correr lo afectado.
+
+### E-001 · 2026-07-22 · Vocabulario de las tareas basadas en claves (resuelve D-001)
+
+**Causa (con nombre, por trazabilidad).** Defecto de **redacción de D2** (autoría del diseño: Fable 5),
+detectado por el ejecutor (Opus 4.8) al implementar los generadores, antes de correr una sola semilla.
+D2 extendió T1 a `L ∈ {8,16,32,64,96,128}` con **claves sin repetir**, pero §4 conservó `vocabulario ≤ 96
+tokens` (heredado del régimen L≤64 de v0.1/v0.2). Con claves únicas, L=96 y L=128 exigen ≥96 y ≥128
+símbolos de clave — imposible con un vocab total ≤96 que además aloja valores y especiales. La extensión de
+D2 no reconcilió §4. No es un error de medición ni de predicción; es una inconsistencia de redacción entre
+dos cláusulas del mismo documento.
+
+**Resolución (opción a, ratificada por Maxi 2026-07-22).** Se separa el pool de claves del de valores y se
+relaja el `≤96` de §4 a lo que D2 exige, **solo para las tareas basadas en claves (T1–T4)**. T5 (multimodal)
+mantiene su propio esquema de tokens, no afectado.
+
+Vocabulario enmendado (T1–T4):
+| Componente | Símbolos | Rango de índices |
+|---|---|---|
+| Pool de **claves** | **128** | 0 … 127 |
+| Pool de **valores** | **64** | 128 … 191 |
+| **Especiales** (5, enumerados) | **5** | BOS=192, SEP=193, PAD=194, CTX_A=195, CTX_B=196 |
+| **VOCAB total** | **197** | 0 … 196 |
+
+- Con 128 claves únicas, T1 admite L hasta 128 sin repetición → cubre `{8,16,32,64,96,128}`. Holgura a
+  L=128 = 0, **idéntica al régimen de TELAR-01** (NK=64 topaba a L=64); se preserva la comparabilidad.
+- CTX_A/CTX_B son los tokens de contexto de T3 (posición 0). PAD es el token neutro de la igualación de
+  largo de O4 (E2). BOS/SEP como en TELAR-01.
+
+**Impacto en parámetros (por condición).**
+- Params atribuibles al vocab (**compartidos e idénticos en toda condición**): embedding de entrada
+  `197×64 = 12 608` + proyección de salida `64×197 + 197 = 12 805` = **25 413**.
+- **Impacto en las comparaciones = nulo.** Estos 25 413 params son comunes a C1, C2, C3, C4 (y a todas las
+  tareas): la diferencia de parámetros entre condiciones proviene de las **cabezas** (softmax vs. delta),
+  no del embedding. Por lo tanto **R2 (params ±5% entre condiciones) queda intacto** — la enmienda no
+  introduce ningún desbalance relativo.
+- Impacto en el presupuesto absoluto: respecto de una lectura literal `vocab≈96` (`12 384` params de vocab),
+  el modelo sube **+13 029 params**, de forma **uniforme**. Sigue en el mismo orden de magnitud (~10⁵) y
+  dentro del régimen chico declarado en §3/§10.
+
+**Alcance.** Desbloquea T1 a L∈{96,128}, S0.9 (carga de evaluación de E1) y la corrida de C1. Se registra
+en `resultados/fase0/margenes_instanciados.md` el VOCAB efectivo usado. Nada más del protocolo cambia.
+
+---
+
 ## Regla de oro post-freeze
 A partir de este archivo, **no se discute más diseño: se corre.** Orden: Fase 0 → E1 → E2 → E3 → E4.
 Toda desviación operativa va a `desviaciones.md` con fecha y motivo, antes de mirar los resultados afectados.
