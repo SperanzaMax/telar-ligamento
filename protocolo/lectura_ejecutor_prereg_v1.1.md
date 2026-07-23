@@ -97,3 +97,45 @@ evaluación y usar esa para PS-5 (es una llamada más a `eval_overwrite`, costo 
 
 O1 y O2 cambian qué contaría como confirmación; O3 y O4 solo agregan precisión a lo que ya se hará. Las cuatro
 son integrables en una pasada. El runner ya está escrito y se adapta a cualquiera de las opciones en minutos.
+
+---
+
+# RESOLUCIÓN (Fable 5, 2026-07-23) — integrada en el v1.1 congelado
+
+- **O1 → opción 2 (doble reporte)**, con tres cláusulas: (a) `N_common` = máximo de los `N_final`, todas las
+  condiciones entrenan hasta ahí; (b) cada condición registra sus métricas al cruzar su convergencia propia
+  (tabla secundaria); (c) **regla de discordancia**: el veredicto lo da la primaria, la secundaria es
+  robustez, y si discrepan → «no concluyente por sensibilidad al presupuesto», nunca se elige la tabla que
+  conviene. Asimetría residual inofensiva: `N_common` lo fija C2, así que C2 queda evaluada en su convergencia
+  y el sobre-entrenamiento recae en las baratas. → **Anexo B.**
+- **O2 → ni 0.95 ni descriptiva: predicción de punto sobre la mediana**, conservando el umbral 0.99 (que
+  significa «salir del techo» y mantiene el vínculo con n*≈35; 0.95 ya es degradación avanzada). La mediana
+  blinda contra el parpadeo de una semilla en L32, y `= 64` en vez de `≥ 64` vuelve la predicción falsable
+  **hacia arriba**: si la convergencia cura L64, el inicio observado era artefacto de presupuesto, no umbral.
+  → **PS-4(i)**, con tercer estado para el empate 4–4.
+- **O3 → obligatorio, con diagnóstico**: además de la parcial, se reportan por separado las correlaciones de
+  cada métrica con el paso de parada. Regla de veredicto explícita con tercer estado. → **PS-5.**
+- **O4 → opción (b) con fallback pre-registrado**: misma-carga es primaria salvo que quede pisada contra el
+  suelo (media ≤ 0.20 o SD < 0.01), en cuyo caso L32 pasa a primaria con la condición cross-carga declarada.
+  Decidido por regla, no mirando cuál da mejor. → **Anexo C.**
+
+## O5 — hallazgo del ejecutor AL IMPLEMENTAR la regla de O3 (antes del freeze)
+
+La regla de PS-5 decía «confundida si la parcial **invierte el signo**». Al escribir el test que simula la
+hipótesis rival exacta —capacidad y T2 gobernadas por `paso_conv` con signos opuestos, sin relación
+residual— resulta **cruda = −1.00 y parcial ≈ 0**: el confound canónico **atenúa** la parcial hacia cero, no
+le da vuelta el signo. Con n = 8, de qué lado del cero cae una parcial ≈ 0 lo decide el ruido, así que la
+regla literal habría reportado **«confirmada»** en el escenario que fue diseñada para detectar.
+
+**Arreglo (aplicado, fiel al espíritu de la regla):** «confirmada» exige que la parcial conserve el signo **y
+retenga ≥ 50 % de la magnitud de la cruda**; por debajo de eso es «confundida por régimen de parada
+(atenuación)». El umbral 0.5 se fijó antes de ver datos. Las sub-etiquetas *inversión*/*atenuación* son
+descriptivas: con n=8 la frontera entre ellas es ruidosa, el veredicto es «confundida» en ambos casos.
+
+**Estatus:** es una corrección de **alcance** de la regla de Fable 5, no un cambio de dirección — sin ella la
+regla no detecta lo que fue escrita para detectar. Quedó incorporada al v1.1 congelado y **declarada como
+precisión del ejecutor**, con su justificación completa, para que Fable 5 pueda objetarla; si la objeta, se
+emite un v1.2 antes de correr (a esta altura todavía no hay datos de E1).
+
+*Verificado en `experimentos/E1/test_analisis_e1.py` (caso construido con residuos ortogonalizados en la
+muestra: retención 0.30 → atenuación) y `test_agregador_e1.py`.*
