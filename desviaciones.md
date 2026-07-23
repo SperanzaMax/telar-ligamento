@@ -28,13 +28,23 @@ discriminantes {64, 96, 128} en un set de validación con semilla propia.
 **Procedimiento (uniforme, nunca por semilla individual):**
 1. Completar las 8 semillas de delta a 2500 (consistencia de la pasada actual). Softmax queda a 2500 (cumple el
    criterio).
-2. Fase de extensión: reanudando desde checkpoints, en **bloques de +2500 pasos aplicados a TODAS las semillas de
-   delta por igual**, hasta que **todas** cumplan el criterio o se alcance el **tope duro de 10 000 pasos**.
-3. **Resultado principal = la tabla convergida** (todas al mismo N). La foto a 2500 = snapshot documentado.
+2. Fase de extensión (`fase0_s09_extend.py`), en **bloques de +2500 pasos aplicados a TODAS las semillas de delta
+   por igual**, hasta que **todas** cumplan el criterio o se alcance el **tope duro de 10 000 pasos**.
+3. **Resultado principal = la tabla convergida** (todas al mismo N, `delta_conv_seed*.json`). La foto a 2500
+   (`delta_seed*.json`) = snapshot documentado.
 
-**Motivo.** El 0.755@L128 y la carga de evaluación del prereg C3-vs-C2 solo son interpretables anclados a números
-**convergidos**. Costo estimado: si delta converge ~5000 pasos, ~5 h más de T4 (una noche) contra el costo de que
-la primera tabla real de Ligamento nazca con un asterisco en su cifra más importante.
+**Nota de implementación (registrada al construir el mecanismo).** El runner base `fase0_s09.py` guardó solo
+métricas, **no los pesos**, así que el **primer bloque de la extensión re-entrena delta desde 0** (re-computa los
+2500 ya hechos + 2500 nuevos); los bloques siguientes (5000→7500→…) **sí reanudan** desde checkpoint de pesos.
+La reanudación se validó **determinista bit-a-bit** (`max|Δ| = 0.00e+00` reanudado vs. corrido), así que el
+re-cómputo produce exactamente los mismos primeros 2500 que el snapshot base — sin inconsistencia, solo costo.
+*(Lección: los runners de E1/TELAR-03 guardan checkpoint de pesos desde el arranque — ya en `train_resumable`.)*
+
+**Motivo y costo real.** El 0.755@L128 y la carga de evaluación del prereg C3-vs-C2 solo son interpretables
+anclados a números **convergidos**. Costo real (mayor que la estimación inicial de ~5 h, que asumía reanudación
+desde 2500): **~10 h de T4 si delta converge a 5000 · ~15 h si a 7500** (por el re-cómputo del primer bloque).
+Una noche larga, contra el costo de que la primera tabla real de Ligamento nazca con un asterisco en su cifra más
+importante.
 
 **Para el futuro (fuera de esta corrección):** la restauración plena de R5 (early stopping con paciencia, tope
 10k) queda para E1 real y TELAR-03 Fase 2. Consenso de los tres.
