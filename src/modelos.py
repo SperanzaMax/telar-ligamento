@@ -24,6 +24,15 @@ D, H, DH = 64, 4, 16
 NB = 4                      # número de bloques
 FFN_HID = 192              # expansión 3
 
+# Regla por cabeza (E1). 's'=softmax, 'd'=delta. Uniformes = C1/C2; mixtas = C3/C4.
+KIND_RULES = {
+    "softmax": ("s", "s", "s", "s"),   # C1
+    "delta":   ("d", "d", "d", "d"),   # C2
+    "mix22":   ("s", "s", "d", "d"),   # C3 (2 softmax + 2 delta)
+    "mix31":   ("s", "s", "s", "d"),   # C4 exploratoria (3+1)
+    "mix13":   ("s", "d", "d", "d"),   # C4 exploratoria (1+3)
+}
+
 
 def glorot(key, shape):
     lim = np.sqrt(6 / (shape[-2] + shape[-1]))
@@ -44,7 +53,7 @@ def init_params(seed, kind):
                'v': glorot(ks[next(i)], (D, D)), 'o': glorot(ks[next(i)], (D, D)),
                'm1': {'w': glorot(ks[next(i)], (D, FFN_HID)), 'b': jnp.zeros(FFN_HID)},
                'm2': {'w': glorot(ks[next(i)], (FFN_HID, D)), 'b': jnp.zeros(D)}}
-        if kind == 'delta':
+        if 'd' in KIND_RULES[kind]:                        # g_beta (zeros, no consume RNG) si hay cabezas delta
             blk['g_beta'] = {'w': jnp.zeros((D, H)), 'b': jnp.zeros(H)}
         p['blocks'].append(blk)
     return p
@@ -73,34 +82,48 @@ def rmsn(x):                           # RMSNorm sobre la última dim (por cabez
     return x / jnp.sqrt((x ** 2).mean(-1, keepdims=True) + 1e-6)
 
 
+def _softmax_heads(q, k, v, T):
+    att = jnp.einsum('bhtd,bhsd->bhts', q, k) / np.sqrt(DH)
+    mask = jnp.tril(jnp.ones((T, T), bool))
+    att = jnp.where(mask, att, -1e9)
+    return jnp.einsum('bhts,bhsd->bhtd', jax.nn.softmax(att, -1), v)       # (B,H,T,DH)
+
+
+def _delta_heads(blk, x, q, k, v, B):
+    kn = l2n(jax.nn.silu(k)); qn = l2n(jax.nn.silu(q))
+    beta = jax.nn.sigmoid(x @ blk['g_beta']['w'] + blk['g_beta']['b'])     # (B,T,H)
+    tm = lambda a: a.transpose(2, 0, 1, 3) if a.ndim == 4 else a.transpose(1, 0, 2)
+    S0 = jnp.zeros((B, H, DH, DH))
+
+    def step(S, inp):
+        qt, kt, vt, bt = inp                                  # (B,H,DH) y (B,H)
+        yt = jnp.einsum('bhij,bhj->bhi', S, qt)               # leer antes de escribir
+        pred = jnp.einsum('bhij,bhj->bhi', S, kt)
+        err = vt - pred
+        S2 = S + bt[..., None, None] * jnp.einsum('bhi,bhj->bhij', err, kt)
+        return S2, yt
+
+    _, ys = jax.lax.scan(step, S0, (tm(qn), tm(kn), tm(v), tm(beta)))
+    return ys.transpose(1, 2, 0, 3)                           # (B,H,T,DH)
+
+
 def mixer(blk, x, kind):
-    """Devuelve la salida de mezcla (B,T,D). RMSNorm por cabeza aplicada SIEMPRE (invariante §5)."""
+    """Salida de mezcla (B,T,D). Cada cabeza usa su regla (KIND_RULES); RMSNorm por cabeza SIEMPRE (invariante §5).
+    Uniformes ('softmax'/'delta') reproducen exactamente C1/C2; mixtas ('mix22'…) combinan por cabeza (C3/C4)."""
     B, T, _ = x.shape
+    rules = KIND_RULES[kind]
+    has_s = 's' in rules; has_d = 'd' in rules
     q = split_heads(x @ blk['q']); k = split_heads(x @ blk['k']); v = split_heads(x @ blk['v'])
-    if kind == 'softmax':
-        att = jnp.einsum('bhtd,bhsd->bhts', q, k) / np.sqrt(DH)
-        mask = jnp.tril(jnp.ones((T, T), bool))
-        att = jnp.where(mask, att, -1e9)
-        y = jnp.einsum('bhts,bhsd->bhtd', jax.nn.softmax(att, -1), v)      # (B,H,T,DH)
-    elif kind == 'delta':
-        kn = l2n(jax.nn.silu(k)); qn = l2n(jax.nn.silu(q))
-        beta = jax.nn.sigmoid(x @ blk['g_beta']['w'] + blk['g_beta']['b'])  # (B,T,H)
-        tm = lambda a: a.transpose(2, 0, 1, 3) if a.ndim == 4 else a.transpose(1, 0, 2)
-        S0 = jnp.zeros((B, H, DH, DH))
-
-        def step(S, inp):
-            qt, kt, vt, bt = inp                                  # (B,H,DH) y (B,H)
-            yt = jnp.einsum('bhij,bhj->bhi', S, qt)               # leer antes de escribir
-            pred = jnp.einsum('bhij,bhj->bhi', S, kt)
-            err = vt - pred
-            S2 = S + bt[..., None, None] * jnp.einsum('bhi,bhj->bhij', err, kt)
-            return S2, yt
-
-        _, ys = jax.lax.scan(step, S0, (tm(qn), tm(kn), tm(v), tm(beta)))
-        y = ys.transpose(1, 2, 0, 3)                              # (B,H,T,DH)
-    else:
-        raise ValueError(f"kind desconocido: {kind}")
-    y = rmsn(y)                                                   # INVARIANTE: RMSNorm por cabeza
+    if has_s and has_d:                                       # C3/C4: ambas ramas, selección por cabeza
+        y_s = _softmax_heads(q, k, v, T)
+        y_d = _delta_heads(blk, x, q, k, v, B)
+        is_s = jnp.array([r == 's' for r in rules])           # (H,)
+        y = jnp.where(is_s[None, :, None, None], y_s, y_d)
+    elif has_s:                                               # C1
+        y = _softmax_heads(q, k, v, T)
+    else:                                                     # C2
+        y = _delta_heads(blk, x, q, k, v, B)
+    y = rmsn(y)                                               # INVARIANTE: RMSNorm por cabeza
     y = y.transpose(0, 2, 1, 3).reshape(B, T, D)
     return y @ blk['o']
 
