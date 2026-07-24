@@ -34,12 +34,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "fase0"))
 from fase0_s09 import device_info, notify
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import analisis_e1 as an
+import planificador as pl
 
 CONDS   = os.environ.get("CONDS", "delta,softmax,mix22,mix31,mix13").split(",")
 LOADS   = [8, 16, 32, 64, 96, 128]
 VAL_LOADS = (96, 128)                 # criterio de convergencia sobre las cargas del veredicto (Maxi)
 N_SEEDS = int(os.environ.get("N_SEEDS", 8))
-BLOCKS  = [2500, 5000, 7500, 10000]   # convergencia uniforme, tope duro 10k
 MAXLOAD = 128
 T2_LOADS = [32, 96, 128]              # Anexo C: T2 en L32 y en las cargas candidatas a evaluación
 LR      = 3e-3
@@ -50,7 +50,7 @@ os.makedirs(RESULTS, exist_ok=True)
 ruta = lambda n: os.path.join(RESULTS, n)
 
 
-def evaluar_y_guardar(params, cond, seed, N, vh, t0, sufijo=""):
+def evaluar_y_guardar(params, cond, seed, N, vh, t0, pasos_en_corrida):
     """Evalúa capacidad (T1) + correctabilidad (T2, varias cargas) y persiste el JSON de la semilla."""
     cap = eval_capacity(params, cond, loads=LOADS, seed=1000 + seed, reps=4)
     t2 = {str(L): eval_overwrite(params, cond, L=L, seed=2000 + seed) for L in T2_LOADS}
@@ -59,39 +59,29 @@ def evaluar_y_guardar(params, cond, seed, N, vh, t0, sufijo=""):
            "paso_conv_propio": an.paso_convergencia_propio(vh),
            "params": count_params(params), "device": device_info(),
            "capacity": {str(L): cap[L] for L in LOADS}, "T2": t2,
-           "val_hist": vh, "wall_s": round(time.time() - t0, 1)}
-    json.dump(out, open(ruta(f"e1_{cond}_seed{seed}{sufijo}.json"), "w"), indent=1)
-    print(f"[E1] {cond} s{seed} @{N}{sufijo} conv={cv} L96={cap[96][1]:.3f} L128={cap[128][1]:.3f}", flush=True)
+           "val_hist": vh, "wall_s": round(time.time() - t0, 1),
+           "pasos_en_corrida": pasos_en_corrida}
+    json.dump(out, open(ruta(f"e1_{cond}_seed{seed}.json"), "w"), indent=1)
+    print(f"[E1] {cond} s{seed} @{N} conv={cv} L96={cap[96][1]:.3f} L128={cap[128][1]:.3f}", flush=True)
     return bool(cv)
 
 
-def entrenar_hasta(cond, N, sufijo=""):
-    """Entrena las N_SEEDS semillas de `cond` hasta N pasos (reanudable). Devuelve flags de convergencia."""
-    flags = []
+def entrenar_unidad(cond, seed, target, pasos_previos):
+    """UNIDAD atómica: lleva una semilla hasta `target` y deja checkpoint + JSON en Drive."""
+    t0 = time.time()
+    params, vh = train_resumable(cond, seed, target, ruta(f"e1_{cond}_seed{seed}.ckpt"),
+                                 max_load=MAXLOAD, lr=LR, val_loads=VAL_LOADS)
+    return evaluar_y_guardar(params, cond, seed, target, vh, t0, target - pasos_previos)
+
+
+def cerrar_faseA(cond, N_final):
+    """B2: congela las métricas de la convergencia propia como tabla SECUNDARIA."""
     for seed in range(N_SEEDS):
-        t0 = time.time()
-        params, vh = train_resumable(cond, seed, N, ruta(f"e1_{cond}_seed{seed}.ckpt"),
-                                     max_load=MAXLOAD, lr=LR, val_loads=VAL_LOADS)
-        flags.append(evaluar_y_guardar(params, cond, seed, N, vh, t0, sufijo))
-    return flags
-
-
-def run_condition(cond):
-    """Pasada 1: bloques de +2500 hasta que las 8 semillas convergen. Devuelve N_final.
-
-    Al converger, congela las métricas de ese punto como tabla SECUNDARIA (`_propio.json`).
-    """
-    N_final = BLOCKS[-1]
-    for N in BLOCKS:
-        flags = entrenar_hasta(cond, N)
-        notify(f"E1 {cond}: bloque {N} · {sum(flags)}/{N_SEEDS} convergidas")
-        if all(flags):
-            N_final = N
-            break
-    for seed in range(N_SEEDS):                       # B2: checkpoint de convergencia propia
-        shutil.copyfile(ruta(f"e1_{cond}_seed{seed}.json"), ruta(f"e1_{cond}_seed{seed}_propio.json"))
-    print(f"[E1] {cond}: convergencia colectiva a N={N_final}", flush=True)
-    return N_final
+        src = ruta(f"e1_{cond}_seed{seed}.json")
+        if os.path.exists(src):
+            shutil.copyfile(src, ruta(f"e1_{cond}_seed{seed}_propio.json"))
+    print(f"[E1] {cond}: fase A cerrada, N_final={N_final} (tabla secundaria congelada)", flush=True)
+    notify(f"E1 {cond}: fase A cerrada · N_final={N_final}")
 
 
 def cargar(cond, sufijo=""):
@@ -209,23 +199,53 @@ def aggregate():
 
 
 def main():
-    print(f"=== E1 · {CONDS} · {N_SEEDS} semillas · {device_info()} ===", flush=True)
-    notify(f"▶️ E1 iniciado · {CONDS} · {N_SEEDS} semillas · {device_info()['device_kind']}")
+    """Una SESIÓN de trabajo: ejecuta las unidades que entren en el presupuesto y corta limpio.
 
-    N_finales = {}
-    for cond in CONDS:                                  # pasada 1: convergencia propia
-        N_finales[cond] = run_condition(cond)
-    N_common = max(N_finales.values())
-    print(f"[E1] N_common = {N_common} (fijado por "
-          f"{[c for c, n in N_finales.items() if n == N_common]})", flush=True)
-    notify(f"E1: pasada 1 lista. N_final por condición = {N_finales} → N_common = {N_common}")
+    MODO=sesion (defecto) | estado (solo informa) | informe (fuerza el agregado)
+    PRESUPUESTO_MIN=210   (3.5 h; Colab free corta a las ~4 h)
+    """
+    modo = os.environ.get("MODO", "sesion")
+    presupuesto = float(os.environ.get("PRESUPUESTO_MIN", 210)) * 60
 
-    for cond, N in N_finales.items():                   # pasada 2: todas hasta N_common (Anexo B1)
-        if N < N_common:
-            print(f"[E1] extendiendo {cond}: {N} → {N_common}", flush=True)
-            entrenar_hasta(cond, N_common)
-    aggregate()
-    notify("🏁 E1 COMPLETO. E1_informe.md listo (PS-1 con doble tabla, PS-2, PS-4, PS-5, P1.2/P1.3).")
+    estado = pl.leer_estado(RESULTS, CONDS, N_SEEDS)
+    costos = pl.costos_medidos(RESULTS, CONDS)
+    print(pl.resumen(estado, CONDS, N_SEEDS, costos, presupuesto), flush=True)
+    if modo == "estado":
+        return
+    if modo == "informe":
+        aggregate()
+        return
+
+    acciones = pl.plan(estado, CONDS, N_SEEDS)
+    hacer, restan, seg_est = pl.sesion(acciones, presupuesto, costos)
+    n_train = sum(1 for a in hacer if a[0] == "entrenar")
+    print(f"\n=== SESIÓN · {n_train} unidades · ≈{pl.fmt(seg_est)} estimados · "
+          f"{device_info()['device_kind']} ===", flush=True)
+    notify(f"▶️ E1 sesión: {n_train} unidades (≈{pl.fmt(seg_est)}), quedan {len(restan)} acciones después")
+
+    t_ini = time.time()
+    for i, (tipo, cond, seed, target) in enumerate(hacer, 1):
+        if tipo == "entrenar":
+            previos = estado[cond]["semillas"].get(seed, {}).get("steps", 0)
+            transcurrido = time.time() - t_ini
+            if transcurrido + pl.estimar_seg((tipo, cond, seed, target), costos) > presupuesto and i > 1:
+                print(f"[E1] presupuesto agotado tras {pl.fmt(transcurrido)}: corto acá, limpio.", flush=True)
+                break
+            print(f"[E1] unidad {i}/{len(hacer)}: {cond} s{seed} {previos}→{target}", flush=True)
+            entrenar_unidad(cond, seed, target, previos)
+            estado[cond]["semillas"][seed] = {"steps": target, "converged": False}
+        elif tipo == "cerrar_faseA":
+            cerrar_faseA(cond, target)
+            estado = pl.leer_estado(RESULTS, CONDS, N_SEEDS)
+        elif tipo == "informe":
+            aggregate()
+            notify("🏁 E1 COMPLETO. E1_informe.md listo (PS-1 doble tabla, PS-2, PS-4, PS-5, P1.2/P1.3).")
+
+    estado = pl.leer_estado(RESULTS, CONDS, N_SEEDS)
+    costos = pl.costos_medidos(RESULTS, CONDS)
+    print("\n" + pl.resumen(estado, CONDS, N_SEEDS, costos, presupuesto), flush=True)
+    notify(f"⏸️ E1 sesión terminada ({pl.fmt(time.time() - t_ini)} de cómputo). "
+           f"Volvé a ejecutar la celda para la siguiente.")
 
 
 if __name__ == "__main__":
