@@ -1,17 +1,18 @@
 # E1 — informe (prereg de seguimiento v1.1) — REGENERADO LOCAL (parcial)
 
-> Regenerado sin JAX desde `resultados/E1/*.json`. Semillas presentes por condición: {'delta': 8, 'softmax': 3, 'mix22': 0}. Las condiciones con <8 semillas están INCOMPLETAS.
+> Regenerado sin JAX desde `resultados/E1/*.json`. Semillas presentes por condición: {'mix22': 3, 'delta': 8, 'softmax': 3}. Las condiciones con <8 semillas están INCOMPLETAS.
 
 > N homogéneo dentro de cada condición.
 
 **N_common = 7500** · **carga de evaluación (desde C2): L96** · **margen efectivo R11 = 0.0200**
 
-N_final por condición (convergencia colectiva propia): delta=—, softmax=—, mix22=—
+N_final por condición (convergencia colectiva propia): mix22=—, delta=—, softmax=—
 
 ### Tabla PRIMARIA — todas las condiciones a N_common = 7500 (da el veredicto)
 
 | cond | L8 | L16 | L32 | L64 | L96 | L128 | T2@32 | N |
 |---|---|---|---|---|---|---|---|---|
+| mix22 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 0.999 | 2500 |
 | delta | 1.000 | 1.000 | 1.000 | 0.983 | 0.916 | 0.814 | 0.960 | 7500 |
 | softmax | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 2500 |
 
@@ -37,6 +38,12 @@ N_final por condición (convergencia colectiva propia): delta=—, softmax=—, 
 - Pearson crudo = -0.678 · IC95 [-0.933, -0.187] · Spearman = -0.762
 - Pearson parcial (control: paso de convergencia propio) = -0.645 · retención = 0.95 (umbral 0.5)
 - diagnóstico: corr(capacidad, paso) = +0.297 · corr(T2, paso) = -0.323
+
+## Protocolo madre
+
+- **P1.1** (C3≈C1 capacidad): softmax en techo → «no evaluable por saturación» (D2).
+- **P1.2** (herencia de correctabilidad): T2(C3) − ½T2(C1) − ½T2(C2) = +0.0193 (≥0 ✓).
+- **P1.3** (no interferencia): T2(C3) = 0.999 vs min(C1,C2) = 0.960 (sin interferencia ✓).
 
 ---
 *Veredictos automáticos según el prereg de seguimiento v1.1. Informe PARCIAL regenerado localmente sin JAX; el definitivo lo emite la celda 9 del notebook con la campaña completa.*
