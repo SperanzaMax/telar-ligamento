@@ -26,3 +26,10 @@ datasets/
 
 # Figuras generadas: descomentar si se vuelven pesadas y se prefiere regenerarlas.
 # *.png
+
+# --- Secretos: NUNCA al repo publico (GitHub + DOI Zenodo) ---
+# Los watchers de Telegram llevan el token del bot en claro.
+watch_telegram.sh
+*watch_telegram*.sh
+*.secret
+.env
