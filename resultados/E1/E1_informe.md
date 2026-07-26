@@ -1,20 +1,20 @@
 # E1 — informe (prereg de seguimiento v1.1) — REGENERADO LOCAL (parcial)
 
-> Regenerado sin JAX desde `resultados/E1/*.json`. Semillas presentes por condición: {'mix22': 3, 'delta': 8, 'softmax': 3}. Las condiciones con <8 semillas están INCOMPLETAS.
+> Regenerado sin JAX desde `resultados/E1/*.json`. Semillas presentes por condición: {'delta': 8, 'softmax': 3, 'mix22': 8}. Las condiciones con <8 semillas están INCOMPLETAS.
 
 > N homogéneo dentro de cada condición.
 
 **N_common = 7500** · **carga de evaluación (desde C2): L96** · **margen efectivo R11 = 0.0200**
 
-N_final por condición (convergencia colectiva propia): mix22=—, delta=—, softmax=—
+N_final por condición (convergencia colectiva propia): delta=—, softmax=—, mix22=—
 
 ### Tabla PRIMARIA — todas las condiciones a N_common = 7500 (da el veredicto)
 
 | cond | L8 | L16 | L32 | L64 | L96 | L128 | T2@32 | N |
 |---|---|---|---|---|---|---|---|---|
-| mix22 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 0.999 | 2500 |
 | delta | 1.000 | 1.000 | 1.000 | 0.983 | 0.916 | 0.814 | 0.960 | 7500 |
 | softmax | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 2500 |
+| mix22 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 0.999 | 2500 |
 
 ### Tabla SECUNDARIA — cada condición en su propia convergencia (robustez)
 
