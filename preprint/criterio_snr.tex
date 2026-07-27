@@ -1,0 +1,503 @@
+\documentclass[jou,11pt,donotrepeattitle]{apa7}
+% APA 7th edition. Compilar:  latexmk -pdf criterio_snr.tex
+\usepackage[american]{babel}
+\usepackage{csquotes}
+\usepackage[style=apa,backend=biber]{biblatex}
+\DeclareLanguageMapping{american}{american-apa}
+\addbibresource{referencias.bib}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{siunitx}
+
+\title{Stopping Criteria Below the Signal-to-Noise Floor: Window Length,
+Not Tolerance, Governs Convergence Detection in Architecture Comparisons}
+\shorttitle{Stopping Criteria Below the Noise Floor}
+\leftheader{Speranza}
+
+\author{Maximiliano Speranza}
+\affiliation{Independent Researcher \\
+Universidad Tecnol\'ogica Nacional, Argentina}
+
+\authornote{\addORCIDlink{}{}
+The author is an independent researcher, a student of the University Technical Degree in
+Programming (\emph{Tecnicatura Universitaria en Programaci\'on}, TUP) at Universidad
+Tecnol\'ogica Nacional (UTN), Argentina, and a graduate of its Diploma in Artificial
+Intelligence. Correspondence concerning this article should be addressed to Maximiliano
+Speranza. E-mail: maximiliano.speranza@gmail.com.
+The stopping criterion analyzed here was pre-registered and frozen with a DOI \emph{before}
+any data were collected, which rules out post hoc selection of the criterion as an explanation
+for the defect reported. The author declares no competing interests and received no funding
+for this work. Code, stored validation histories, and the analysis script that reproduces every
+number reported here are publicly available (see Open Practices).}
+
+\abstract{%
+Architecture comparisons in efficient sequence modeling commonly stop training with a rule of
+the form ``improvement in validation accuracy over the last $w$ steps is below a tolerance
+$\tau$,'' and then grant every architecture the resulting budget. We analyze one such rule that
+was pre-registered and frozen with a DOI before data collection, and show that it could not
+detect convergence---not because its tolerance was miscalibrated, but because the stopping
+decision was taken below the signal-to-noise floor of the measurement. In a multi-query
+associative recall benchmark, the delta-rule linear-attention condition improved at a rate of
+$0.31$ accuracy points per evaluation in the regime treated as a plateau (positive in seven of
+eight seeds; $t = 4.20$, $p = .004$), while the noise of the tested difference was $1.16$ points,
+giving a signal-to-noise ratio of $0.27$. Under this ratio no tolerance separates the two errors
+of interest: rules that detect a plateau also stop during genuine improvement. We show that a
+proposed remedy---window means with a noise-calibrated tolerance---has a detection rate that is
+algebraically fixed at $\Phi(2)$ regardless of window length, and would have declared convergence
+while the model was still improving with probability $.73$. Decomposing the achievable gain, a
+factor of $7.0$ comes from lengthening the comparison window and only $1.31$ from replacing the
+two-point difference with a trend test. The failure is architecture-dependent: saturating
+conditions exhibit noise three orders of magnitude smaller and close immediately, so the shared
+budget covaries with the quantity under comparison. We give a power-based rule for choosing $w$
+that can be pre-registered without pilot data. All analyses reuse stored validation histories
+and require no additional training.}
+
+\keywords{stopping criterion, early stopping, statistical power, pre-registration,
+linear attention, associative recall, training budget, reproducibility}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+Architecture comparisons in efficient sequence modeling rest on a decision that is rarely
+examined: when to stop training. A common practice is to train a reference architecture until a
+convergence rule fires and then grant every competing architecture the same number of steps
+\parencite{li2019budgeted}. The procedure is sound only if convergence can be detected reliably.
+If detection is unreliable, the shared budget inherits that unreliability, and so does the
+comparison.
+
+This article reports a case in which detection was impossible by construction, and characterizes
+why. The setting is a pre-registered comparison of attention head compositions on multi-query
+associative recall \parencite[MQAR;][]{arora2023zoology}. The stopping rule was specified,
+frozen, and published with a DOI before any model was trained. That matters for the argument
+developed here: the defect cannot be attributed to a rule chosen after seeing the results,
+because the rule could not have been chosen after seeing them.
+
+Our diagnosis differs from the one an inspection of the rule alone would suggest. The tolerance
+was indeed smaller than the noise of the metric, and it is tempting to conclude that the rule
+therefore measured noise instead of convergence. That conclusion does not survive contact with
+the data. The regime the rule was applied to was not a plateau: the architecture of interest was
+still improving, at a rate that a longer window would have detected. The rule failed because the
+\emph{stopping decision} was taken below the signal-to-noise floor of the measurement, and no
+choice of tolerance repairs a decision taken below that floor.
+
+Our contribution is fourfold. First, we show that the regime treated as converged carried a
+statistically detectable improvement trend, so the diagnosis must be framed in terms of
+signal-to-noise rather than tolerance. Second, we show that recalibrating the tolerance to
+measured noise---the natural remedy---produces a detection rate that is algebraically fixed and
+independent of the window, and buys detection power at the cost of stopping during genuine
+improvement. Third, we decompose the achievable gain and find that window length dominates the
+choice of test statistic by a factor of five. Fourth, we show that the noise driving all of this
+is architecture-dependent, which converts an apparently neutral procedural choice into a
+confound aligned with the variable under study, and we give a power-based rule for $w$ that is
+pre-registrable without pilot data.
+
+\section{The Pre-Registered Setting}
+
+The experiment compares three head compositions in a small transformer ($193{,}493$ parameters)
+on MQAR: \texttt{softmax} (standard attention), \texttt{delta} (delta-rule linear attention),
+and \texttt{mix22} (two softmax heads and two delta heads in the same layer). Delta-rule linear
+attention updates a fixed-size associative state by correcting the current read before writing
+\parencite{yang2024gated}; hybrid compositions are known to recover recall capacity that purely
+linear variants do not reach \parencite{arora2023zoology,arora2024simple}.
+
+Validation accuracy was evaluated every $500$ steps as the mean of top-1 accuracy over loads
+$\{64, 96, 128\}$, on a validation set held fixed across evaluations by a fixed random seed. The
+pre-registered rule, denoted D-004, declares convergence at step $N$ when
+%
+\begin{equation}
+\mathrm{acc}(N) - \mathrm{acc}(N - w) < \tau ,
+\label{eq:d004}
+\end{equation}
+%
+with $w = 500$ and $\tau = 0.005$. Because evaluations are spaced $500$ steps apart,
+Equation~\ref{eq:d004} compares two \emph{consecutive} evaluations. A condition closes its first
+training phase only when all eight seeds satisfy Equation~\ref{eq:d004}; otherwise training
+proceeds in blocks of $2{,}500$ steps up to a cap of $10{,}000$. The common budget for the
+primary comparison is then the maximum of the per-condition convergence points, so one
+condition's stopping behavior sets the budget granted to all.
+
+\section{Method}
+
+All analyses reuse validation histories stored during the original campaign; no model was
+retrained. The data comprise eight \texttt{delta} runs, eight \texttt{mix22} runs, and three
+\texttt{softmax} runs, plus one \texttt{delta} seed extended to $10{,}000$ steps and used only
+where noted.
+
+\subsection{Noise and Trend Estimation}
+
+For each run we isolate the late-training regime---from step $4{,}000$ for \texttt{delta} and
+$1{,}000$ for the saturating conditions---and fit an ordinary least-squares line to validation
+accuracy against evaluation index. We estimate noise by two methods: the standard deviation of
+residuals from that fit, and the standard deviation of successive differences divided by
+$\sqrt{2}$. The second is unbiased under a linear trend and therefore serves as a check on the
+first. The quantity that governs Equation~\ref{eq:d004} is the standard deviation of the tested
+difference, $\sigma_D = \sigma\sqrt{2}$.
+
+The trend is tested per run by the OLS slope $b$ against $H_0\colon b = 0$, one-tailed, and
+across runs by a one-sample $t$ test on the eight slopes.
+
+\subsection{Detection Probability}
+
+We report two estimates. The parametric estimate models late-training observations as
+$\mathrm{acc}(N) = \mu + \varepsilon$ with $\varepsilon \sim \mathcal{N}(0, \sigma^2)$, giving
+$P = \Phi(\tau / \sigma_D)$ for one seed and $P^{k}$ for $k$ independent seeds. The
+non-parametric estimate exploits the fact that Equation~\ref{eq:d004} with $w$ equal to the
+evaluation interval \emph{is} a successive difference: we therefore report the observed fraction
+of successive differences below $\tau$, which requires no distributional assumption and no
+assumption of independence.
+
+\section{Results}
+
+\subsection{Metric Noise Is Architecture-Dependent}
+
+Table~\ref{tab:ruido} reports late-training noise by condition. The two estimators agree to
+within $1\%$, which also indicates that residual autocorrelation is negligible
+(see Assumption Checks). The decisive quantity is $\tau / \sigma_D$: below $1$, the tolerance
+cannot resolve the noise of the quantity it is compared against.
+
+\begin{table}[htbp]
+\caption{Late-Training Noise of Validation Accuracy by Condition}
+\label{tab:ruido}
+\small
+\begin{tabular}{lccccc}
+\toprule
+Cond. & $n$ & $\sigma_{\text{resid}}$ & $\sigma_{\text{diff}}$ & $\sigma_D$ & $\tau/\sigma_D$ \\
+\midrule
+\texttt{delta}   & 8 & 0.00821 & 0.00829 & 0.01162 & 0.43 \\
+\texttt{mix22}   & 8 & 0.00004 & 0.00004 & 0.00006 & 86.9 \\
+\texttt{softmax} & 3 & 0.00004 & 0.00004 & 0.00006 & 88.8 \\
+\bottomrule
+\end{tabular}
+
+\vspace{5pt}
+{\small\raggedright \textit{Note.} $\sigma_D = \sigma_{\text{resid}}\sqrt{2}$ is the standard deviation of
+the difference tested by Equation~\ref{eq:d004}. Estimates use eight late-training evaluations
+per run for \texttt{delta} and four for the saturating conditions; the ratios for the latter
+should be read as ``two orders of magnitude or more,'' not as precise values.
+\par}
+\end{table}
+
+The three conditions differ in $\sigma$ by roughly three orders of magnitude. A single fixed
+tolerance is thus highly informative for two of them and unusable for the third.
+
+\subsection{The Regime Is Not a Plateau}
+
+Before asking whether the rule detects convergence, we ask whether there was convergence to
+detect. Table~\ref{tab:tend} tests the trend in the regime the rule was applied to.
+
+\begin{table}[htbp]
+\caption{Trend Test in the Regime Treated as Converged (Steps 4,000--7,500)}
+\label{tab:tend}
+\small
+\begin{tabular}{lrrrrc}
+\toprule
+Seed & $b$ & $t$ & $p$ & Gain & D-004 \\
+\midrule
+0 & $+0.00259$ & 1.86 & .056 & $+1.81$ & yes \\
+1 & $+0.00234$ & 1.72 & .068 & $+1.64$ & no \\
+2 & $+0.00421$ & 2.54 & .022 & $+2.95$ & yes \\
+3 & $+0.00334$ & 5.12 & .001 & $+2.34$ & no \\
+4 & $-0.00014$ & $-0.12$ & .547 & $-0.10$ & yes \\
+5 & $+0.00445$ & 3.58 & .006 & $+3.11$ & no \\
+6 & $+0.00141$ & 1.37 & .110 & $+0.98$ & yes \\
+7 & $+0.00680$ & 4.13 & .003 & $+4.76$ & no \\
+\bottomrule
+\end{tabular}
+
+\vspace{5pt}
+{\small\raggedright \textit{Note.} $b$ is the OLS slope per evaluation; $p$ values are one-tailed against
+$H_0\colon b = 0$. ``Gain'' is the fitted improvement in accuracy points over the $3{,}500$ steps
+of the window. The last column reports whether Equation~\ref{eq:d004} declared convergence at
+step $7{,}500$.
+\par}
+\end{table}
+
+The slope is positive in seven of eight seeds, with mean $+0.00312$ per evaluation; a one-sample
+$t$ test on the eight slopes rejects zero, $t(7) = 4.20$, $p = .004$. Extrapolating the mean
+slope predicts $+1.56$ accuracy points from step $7{,}500$ to $10{,}000$. The one seed actually
+extended to $10{,}000$ gained $+1.39$ points of capacity at load~96 ($0.9167 \rightarrow
+0.9306$), consistent with the projection.
+
+This reframes the problem. The \texttt{delta} condition had not converged at $7{,}500$ steps.
+Driving it to the step cap was not an artifact of a noisy rule; it was the correct outcome
+reached for the wrong reason. The rule cannot be faulted for failing to detect a convergence
+that had not occurred---but neither can it be credited, since Table~\ref{tab:tend} shows its
+classifications bear no reliable relation to the measured trend.
+
+\subsection{The Decision Is Taken Below the Signal-to-Noise Floor}
+
+The two quantities can now be compared directly. The signal available to
+Equation~\ref{eq:d004} is one evaluation interval of improvement, $b = 0.00312$; the noise of
+the tested difference is $\sigma_D = 0.01162$. Their ratio is
+%
+\begin{equation}
+\mathrm{SNR} = \frac{b}{\sigma_D} = 0.27 .
+\label{eq:snr}
+\end{equation}
+%
+This single number governs everything that follows. A stopping rule must balance two errors:
+continuing to train after convergence, and stopping while improvement remains. With
+$\mathrm{SNR} < 1$ the two error rates cannot be separated by any choice of $\tau$, because the
+distributions being discriminated overlap almost completely. Tolerance selection is not the
+lever; it merely slides a decision boundary along an axis on which the two hypotheses are not
+distinguishable.
+
+\subsection{Detection Probability}
+
+For \texttt{delta}, the parametric model gives $P = \Phi(0.43) = .667$ per seed and
+$P^{8} = .039$ for all eight simultaneously. The non-parametric estimate---the observed fraction
+of successive differences below $\tau$ in the same regime, $N = 56$---gives $P = .554$,
+95\% CI $[.423, .684]$, and $P^{8} = .009$. The non-parametric estimate is preferable: it
+assumes nothing, and it fits the observation better. Four of eight seeds were classified as
+converged; the expected count is $4.4$ under the non-parametric estimate ($P(X \leq 4) = .52$)
+versus $5.3$ under the parametric one ($P(X \leq 4) = .26$).
+
+Either way, the condition had less than a $4\%$ chance of ever closing its phase by
+convergence---which is the correct outcome here, since it had not converged, but would have been
+equally true had it converged.
+
+\subsection{Recalibrating the Tolerance Does Not Help}
+
+The natural remedy is to compare window means rather than points, and to set the tolerance from
+measured noise:
+%
+\begin{equation}
+\overline{\mathrm{acc}}_{\text{last } m} - \overline{\mathrm{acc}}_{\text{prev. } m} < c\,\sigma_D^{(m)},
+\qquad \sigma_D^{(m)} = \sigma\sqrt{2/m} .
+\label{eq:fix}
+\end{equation}
+%
+With $m = 3$ and $c = 2$, the all-seed detection probability rises from $.039$ to $.832$. That
+figure is not evidence of a better rule. Setting the tolerance to $c\,\sigma_D^{(m)}$ makes the
+per-seed detection rate equal to $\Phi(c)$ \emph{identically}, for any $m$ and any $\sigma$: with
+$c = 2$ it is $\Phi(2) = .977$ whatever the window. Table~\ref{tab:desc} separates the two
+ingredients on our data. The entire gain comes from relaxing the tolerance, not from windowing.
+
+\begin{table*}[htbp]
+\caption{Decomposition of the Detection Gain}
+\label{tab:desc}
+\begin{tabular}{lccc}
+\toprule
+Variant & $\tau$ & $\sigma_D$ & $P^{8}$ \\
+\midrule
+D-004 as pre-registered              & 0.0050 & 0.01162 & .039 \\
+Windowing only ($m = 3$, $\tau$ fixed) & 0.0050 & 0.00671 & .126 \\
+Retuned tolerance only ($2\sigma_D$) & 0.0232 & 0.01162 & .832 \\
+Equation~\ref{eq:fix} in full        & 0.0134 & 0.00671 & .832 \\
+\bottomrule
+\end{tabular}
+
+\vspace{5pt}
+{\small\raggedright \textit{Note.} $P^{8}$ is the probability that all eight seeds are simultaneously
+declared converged while on a plateau. The two lower rows coincide because setting
+$\tau = 2\sigma_D$ fixes the per-seed rate at $\Phi(2)$ irrespective of the window.
+\par}
+\end{table*}
+
+The cost of that relaxation is the error the detection rate does not measure. Under a true
+improvement rate $b$, the probability that Equation~\ref{eq:fix} declares convergence anyway is
+$\Phi\!\left(c - b\,m/\sigma_D^{(m)}\right)$. At the improvement rate actually measured, that
+probability is $.73$: the proposed rule would have stopped \texttt{delta} while it was still
+gaining roughly one accuracy point per window. Its minimum detectable improvement, at a $5\%$
+false-stop rate, is $4.07$ points per $2{,}500$-step block---larger than the $1.39$-point gain
+that the extended seed actually realized over such a block. A rule tuned to detect plateaus
+reliably in this regime is, necessarily, a rule that stops during real progress.
+
+\subsection{Window Length Dominates the Test Statistic}
+
+What does raise the floor is the window. For $n$ equally spaced evaluations, the OLS slope has
+standard error
+%
+\begin{equation}
+\mathrm{SE}(b) = \sigma \sqrt{\frac{12}{n(n^{2}-1)}} ,
+\label{eq:se}
+\end{equation}
+%
+which falls as $n^{-3/2}$, against $n^{-1/2}$ for averaging. On our data, with $n = 8$
+evaluations, $\mathrm{SE}(b) = 0.00127$ and the measured mean slope yields $t = 2.46$: the same
+eight points that leave Equation~\ref{eq:d004} at $\mathrm{SNR} = 0.27$ support detection when
+used jointly. The total gain of $9.2\times$ decomposes into $7.0\times$ from comparing points
+seven evaluations apart instead of one, and $1.31\times$ from using the trend statistic instead
+of the endpoint difference. Window length, not the choice of statistic and not the tolerance, is
+the dominant term.
+
+This yields a rule that can be fixed in advance. Given a smallest improvement rate $b^{*}$ that
+the study commits to not overlooking, a one-tailed level $\alpha$, and power $1 - \beta$, the
+window must satisfy
+%
+\begin{equation}
+b^{*} \geq (z_{\alpha} + z_{\beta})\, \sigma \sqrt{\frac{12}{n(n^{2}-1)}} .
+\label{eq:power}
+\end{equation}
+%
+Table~\ref{tab:pot} evaluates Equation~\ref{eq:power} at the noise level measured here. It shows
+what the original design would have required: detecting an improvement of one accuracy point per
+$2{,}500$ steps needs about eleven evaluations, whereas D-004 used two.
+
+\begin{table}[htbp]
+\caption{Detectable Improvement as a Function of Window Length}
+\label{tab:pot}
+\small
+\begin{tabular}{cccc}
+\toprule
+$n$ & Window & $\mathrm{SE}(b)$ & $b^{*}$ \\
+\midrule
+4  & 1,500 & 0.00367 & 4.56 \\
+6  & 2,500 & 0.00196 & 2.44 \\
+8  & 3,500 & 0.00127 & 1.58 \\
+10 & 4,500 & 0.00090 & 1.12 \\
+12 & 5,500 & 0.00069 & 0.85 \\
+16 & 7,500 & 0.00045 & 0.55 \\
+20 & 9,500 & 0.00032 & 0.40 \\
+\bottomrule
+\end{tabular}
+
+\vspace{5pt}
+{\small\raggedright \textit{Note.} $n$ = number of evaluations in the window; ``Window'' is its span in
+training steps. $\sigma = 0.00821$, $\alpha = .05$ one-tailed, power $= .80$. $b^{*}$ is the
+smallest improvement rate detectable with that power, in accuracy points per $2{,}500$ steps.
+\par}
+\end{table}
+
+Equation~\ref{eq:power} needs $\sigma$, which is not known before training. Two routes avoid
+circularity. Where the validation set is resampled at each evaluation, sampling error gives an
+analytic lower bound, $\sigma \geq \sqrt{p(1-p)/n_{\text{val}}}$, computable at design time.
+Where it is held fixed, as here, that term vanishes and the residual noise is optimizer
+variability, which must be measured; a short pilot on any one condition suffices, and---unlike
+retuning a tolerance after seeing results---it fixes a window, not a verdict.
+
+\subsection{Propagation to the Training Budget}
+
+Because the rule sets the common budget, its architecture-dependence is not neutral. Saturating
+conditions have $\tau/\sigma_D \approx 87$ and close at the first opportunity; the non-saturating
+condition is still improving and is driven to the cap. Whichever budget is then adopted is
+either insufficient for the condition that is still learning or far beyond what the saturating
+ones need, and \emph{which of the two occurs is decided by the conditions that saturate}. The
+granted budget thus covaries with task performance---the very quantity under comparison.
+
+The magnitude is material. The pre-registered decision margin for the primary hypothesis was
+$2$ accuracy points; the seed extended from $7{,}500$ to $10{,}000$ steps gained $1.39$ points of
+capacity at load~96. A budget-induced difference of the same order as the decision margin is not
+a rounding concern. This estimate rests on a single extended seed and is indicative rather than
+conclusive; the trend analysis of Table~\ref{tab:tend}, which uses all eight, supports the same
+direction and magnitude.
+
+\subsection{Assumption Checks}
+\label{sec:assump}
+
+\paragraph{Residual autocorrelation.} Lag-1 autocorrelation of detrended residuals is negative
+in seven of eight runs, median $-0.315$, which invites a correction to $\mathrm{Var}(D)$. The
+correction would be spurious. With $n = 8$ points and a fitted trend removed, the lag-1 estimator
+is strongly biased downward even for white noise: simulation under white noise ($20{,}000$
+replicates) gives $E[\hat\rho_1] = -0.287$, 95\% interval $[-0.803, +0.310]$, placing the
+observed median at the $49$th percentile of the null. This is the small-sample bias of
+autocorrelation estimators \parencite{marriott1954bias}. The data contain an independent check:
+were $\rho_1 = -0.315$ real, $\sigma_{\text{diff}}/\sigma_{\text{resid}}$ would equal
+$\sqrt{1-\rho_1} = 1.147$; the observed ratio is $1.010$, implying $\rho_1 = -0.02$. We therefore
+treat the residuals as serially uncorrelated. We note the point because the tempting
+correction runs in the direction that flatters the argument, and would have been reported as
+support for it.
+
+\paragraph{Source of the noise.} The validation set is held fixed across evaluations by a fixed
+seed, and comprises roughly $37{,}000$ queries; resampling error would contribute $\sigma \approx
+0.0018$ and, being fixed, contributes none. The measured $\sigma = 0.0082$ is therefore
+attributable to optimizer variability, not to measurement error. Enlarging the validation set
+would not reduce it; temporal averaging or weight averaging would.
+
+\paragraph{Choice of regime onset.} Varying the onset from step $2{,}500$ to $5{,}000$ leaves
+$\tau/\sigma_D$ between $0.39$ and $0.51$, always well below unity, and leaves the sign and
+significance of the trend unchanged.
+
+\paragraph{Does validation accuracy track the quantity of interest?} Across the eight
+\texttt{delta} seeds, final validation accuracy correlates with capacity at load~96 at
+$r = .96$ and at load~128 at $r = .99$. The metric is not blind to the axis under study; it is
+noisy relative to its own rate of change. The problem is one of power, not of construct.
+
+\section{Discussion}
+
+\subsection{Implications}
+
+The practical cost of a stopping rule below the noise floor is not primarily wasted computation,
+although in our campaign roughly $80\%$ of the projected budget was attributable to it. The
+serious cost is that the training budget becomes a function of the metric's noise, which is
+itself a function of where the architecture sits on the task. Architectures that saturate stop
+early; architectures in the interesting intermediate regime are driven to the cap. Any
+comparison drawn across that asymmetry is confounded, and the confound is aligned with the
+variable the study exists to measure.
+
+The episode also carries a lesson about pre-registration. Freezing a stopping rule is good
+practice, but a rule frozen without a power analysis freezes an unexamined assumption about the
+noise of the metric. Our pre-registration fixed $\tau$ and $w$ and said nothing about $\sigma$;
+Equation~\ref{eq:power} is what should have been registered instead, since it states what the
+study commits to detecting rather than how it will compute a difference. This is the analogue,
+for training-time decisions, of registering a target effect size rather than a $p$-value
+threshold.
+
+\subsection{Relation to Prior Work}
+
+That validation-based early stopping is unstable in noisy regimes is established
+\parencite{prechelt1998automatic}, as is the need to control training budget when comparing
+architectures \parencite{li2019budgeted}, and seed-sampling noise has been shown to affect the
+reliability of synthetic benchmarks \parencite{chanin2026reliable}. The specific contribution here
+is the chain that links them and its quantification: a stopping decision taken below the
+signal-to-noise floor, a floor that differs by three orders of magnitude across the architectures
+being compared, and a budget rule that transmits that difference into the comparison. We also
+report, as a cautionary detail, that the two natural repairs---retuning the tolerance to measured
+noise, and averaging over a window---address the smaller term while leaving the dominant one
+untouched.
+
+\subsection{Limitations}
+
+This is a single documented case, not a general study. It involves one task family (MQAR), one
+model scale ($193$K parameters), one hardware platform, three conditions, and eight seeds per
+condition. We do not claim that fixed-tolerance rules fail generally, nor that any published
+result is invalidated by this mechanism. The budget-effect estimate at load~96 rests on one
+extended seed; the trend analysis that corroborates it uses all eight but extrapolates beyond
+the observed range. The power rule of Equation~\ref{eq:power} assumes an approximately linear
+improvement trend and homoscedastic noise over the window, which is an approximation for
+late-training dynamics and would fail near a sharp transition. Finally, Equation~\ref{eq:power}
+is derived here and validated only retrospectively; prospective validation remains future work,
+and is the natural next step for this line.
+
+\subsection{Recommendations}
+
+We suggest four inexpensive practices. First, before fixing a stopping rule, state the smallest
+improvement rate the study commits to detecting, and size the window from it via
+Equation~\ref{eq:power}; report the resulting power. Second, report $\tau/\sigma_D$ rather than
+$\tau$ alone, since the tolerance is uninterpretable without the noise of the quantity it is
+compared against. Third, report noise per condition: a rule adequate for one architecture may be
+unusable for another in the same study, and that asymmetry is a confound, not an inconvenience.
+Fourth, when a rule is relaxed to raise its detection rate, report the complementary error---the
+probability of stopping under the smallest improvement that matters---because detection rate
+alone can always be driven to any desired value.
+
+\section{Conclusion}
+
+A stopping rule compares an improvement against a tolerance, but what determines whether it can
+work is neither of those quantities in isolation: it is the ratio between the improvement
+accumulated over the comparison window and the noise of the comparison. When that ratio is
+below unity, the rule reports which way the last evaluation happened to fall, and no tolerance
+recovers the decision. Lengthening the window does, at a rate that makes the fix cheap. When such
+a rule also sets the shared training budget of an architecture comparison, its
+architecture-dependent noise sensitivity converts a procedural choice into a confound aligned
+with the variable under study. Diagnosing this required nothing beyond validation histories that
+were already being stored, and correcting it requires no additional training.
+
+\section*{Open Practices}
+
+The pre-registration was frozen and published before data collection
+(DOI:~10.5281/zenodo.21495252). Code, stored validation histories, and the analysis script that
+reproduces the reported numbers are available at
+\url{https://github.com/SperanzaMax/telar-ligamento}; the analysis runs on CPU in under a
+minute. One exception must be stated: the single \texttt{delta} seed extended to $10{,}000$
+steps, cited once for its capacity gain of $1.39$ points, was lost to a session failure before
+it could be versioned, and is the only quantity here that cannot be recomputed from the
+repository. Every other figure, including the trend analysis that independently predicts that
+gain, derives from the eight versioned runs.
+
+\printbibliography
+
+\end{document}

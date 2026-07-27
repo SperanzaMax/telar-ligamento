@@ -33,3 +33,20 @@ watch_telegram.sh
 *watch_telegram*.sh
 *.secret
 .env
+
+# --- LaTeX: auxiliares regenerables ---
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.out
+*.run.xml
+*.synctex.gz
+preprint/*.log
+
+# --- Borrador descartado (v1 del preprint, con el argumento de autocorrelacion
+#     que la auditoria del 2026-07-27 demostro espurio). Se conserva local. ---
+preprint/criterio_convergencia.*
+preprint/revision_adversarial_prompt.txt

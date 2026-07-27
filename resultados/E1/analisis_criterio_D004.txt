@@ -1,0 +1,77 @@
+====================================================================================================
+A. RUIDO DE val_acc EN PLATEAU  (σ_reg = SD de residuos; σ_dif = SD de Δ consecutivos /√2)
+====================================================================================================
+    cond seed      N n_pts   media    σ_reg    σ_dif  ac_lag1   conv
+   delta    0   7500     8  0.8649  0.00903  0.00963   -0.322   True
+   delta    1   7500     8  0.8636  0.00882  0.00772   -0.108  False
+   delta    2   7500     8  0.8610  0.01073  0.01230   -0.517   True
+   delta    3   7500     8  0.8511  0.00423  0.00439   -0.307  False
+   delta    4   7500     8  0.8558  0.00754  0.00758   -0.025   True
+   delta    5   7500     8  0.8436  0.00805  0.00786   -0.364  False
+   delta    6   7500     8  0.8483  0.00664  0.00553    0.184   True
+   delta    7   7500     8  0.8470  0.01068  0.01133   -0.558  False
+   mix22    0   2500     4  1.0000  0.00001  0.00001   -0.521   True
+   mix22    1   2500     4  1.0000  0.00004  0.00004   -0.569   True
+   mix22    2   2500     4  1.0000  0.00002  0.00002   -0.569   True
+   mix22    3   2500     4  1.0000  0.00003  0.00003   -0.502   True
+   mix22    4   2500     4  0.9999  0.00009  0.00009   -0.543   True
+   mix22    5   2500     4  1.0000  0.00006  0.00007   -0.691   True
+   mix22    6   2500     4  1.0000  0.00000  0.00000    0.500   True
+   mix22    7   2500     4  1.0000  0.00008  0.00009   -0.636   True
+ softmax    0   2500     4  1.0000  0.00002  0.00002   -0.715   True
+ softmax    1   2500     4  1.0000  0.00002  0.00002   -0.569   True
+ softmax    2   2500     4  0.9999  0.00009  0.00009   -0.590   True
+   delta    0  10000    13  0.8675  0.00977  0.01048   -0.172  False
+
+    cond  σ medio (reg)  σ medio (dif)    tol/σ  interpretación
+   delta        0.00839        0.00854     0.60  tol < ruido: criterio AZAROSO
+   mix22        0.00004        0.00004   122.83  tol >> ruido: criterio informativo
+ softmax        0.00004        0.00004   125.65  tol >> ruido: criterio informativo
+
+====================================================================================================
+B. P(declarar convergencia) BAJO PLATEAU REAL
+   D = val[N] - val[N-500] ~ N(0, 2σ²)  →  P(D < tol) = Φ(tol / (σ√2))
+====================================================================================================
+   delta: σ=0.00839 → P(1 semilla)=0.663 · esperadas de 9: 6.0 · OBSERVADAS: 4 · P(8/8 simultáneo)=0.0375
+   mix22: σ=0.00004 → P(1 semilla)=1.000 · esperadas de 8: 8.0 · OBSERVADAS: 8 · P(8/8 simultáneo)=1.0000
+ softmax: σ=0.00004 → P(1 semilla)=1.000 · esperadas de 3: 3.0 · OBSERVADAS: 3 · P(8/8 simultáneo)=1.0000
+
+====================================================================================================
+C. CRITERIO DE VENTANA:  mean(últimas m) - mean(m previas) < tol
+   σ_D baja de σ√2 a σ√(2/m). Con tol calibrada al ruido medido en vez de fija.
+====================================================================================================
+    cond   m       σ_D  P(1 semilla)    P(8/8)   con tol fija 0.005
+   delta   1   0.01186         0.663    0.0375
+   delta   3   0.00685         0.767    0.1202
+   delta   5   0.00530         0.827    0.2190
+            → con tol CALIBRADA = 2·σ_D (m=3): P(1)=0.977 · P(8/8)=0.832
+   mix22   1   0.00006         1.000    1.0000
+   mix22   3   0.00003         1.000    1.0000
+   mix22   5   0.00003         1.000    1.0000
+            → con tol CALIBRADA = 2·σ_D (m=3): P(1)=0.977 · P(8/8)=0.832
+ softmax   1   0.00006         1.000    1.0000
+ softmax   3   0.00003         1.000    1.0000
+ softmax   5   0.00003         1.000    1.0000
+            → con tol CALIBRADA = 2·σ_D (m=3): P(1)=0.977 · P(8/8)=0.832
+
+   Aplicado a las series reales de delta (m=3, tol calibrada = 2σ_D):
+      s0 @7500: Δmedias=+0.00728 vs tol_cal=0.01370 → CONVERGE   (D-004 decía: True)
+      s1 @7500: Δmedias=+0.01182 vs tol_cal=0.01370 → CONVERGE   (D-004 decía: False)
+      s2 @7500: Δmedias=+0.00817 vs tol_cal=0.01370 → CONVERGE   (D-004 decía: True)
+      s3 @7500: Δmedias=+0.00963 vs tol_cal=0.01370 → CONVERGE   (D-004 decía: False)
+      s4 @7500: Δmedias=-0.00312 vs tol_cal=0.01370 → CONVERGE   (D-004 decía: True)
+      s5 @7500: Δmedias=+0.01979 vs tol_cal=0.01370 → no converge   (D-004 decía: False)
+      s6 @7500: Δmedias=+0.00241 vs tol_cal=0.01370 → CONVERGE   (D-004 decía: True)
+      s7 @7500: Δmedias=+0.01649 vs tol_cal=0.01370 → no converge   (D-004 decía: False)
+      s0 @10000: Δmedias=+0.00323 vs tol_cal=0.01370 → CONVERGE   (D-004 decía: False)
+
+====================================================================================================
+D/E. PROPAGACIÓN AL PRESUPUESTO
+====================================================================================================
+   delta s0 @10000: L96=0.9306 L128=0.8297 converged=False
+   delta 8 semillas @7500: L96 medio=0.9161
+   → el MISMO modelo cambia 0.9161 → 0.9306 (+1.45 pts) solo por presupuesto
+
+   Sesgo estructural: σ(saturadas)≈0 → cierran enseguida; σ(delta) alto → va al tope.
+   El criterio NO es simétrico: castiga con más pasos justamente a la arquitectura
+   que peor resuelve la tarea, que es la variable bajo estudio.

@@ -1,0 +1,541 @@
+\documentclass[jou,11pt,donotrepeattitle]{apa7}
+% APA 7.ª edición — versión en español. Compilar:  latexmk -pdf criterio_snr_es.tex
+\usepackage[spanish,es-tabla,es-noquoting]{babel}
+% Punto decimal en todo el documento: los valores deben coincidir digito a digito
+% con la version en ingles, con el repositorio y con la salida del script de analisis.
+\decimalpoint
+\usepackage{csquotes}
+\usepackage[style=apa,backend=biber]{biblatex}
+\DeclareLanguageMapping{spanish}{spanish-apa}
+\addbibresource{referencias.bib}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{siunitx}
+
+\title{Criterios de detenci\'on por debajo del piso de se\~nal-ruido:
+la longitud de la ventana, no la tolerancia, gobierna la detecci\'on de convergencia
+en comparaciones de arquitecturas}
+\shorttitle{Criterios de detenci\'on bajo el piso de ruido}
+\leftheader{Speranza}
+
+\author{Maximiliano Speranza}
+\affiliation{Investigador independiente \\
+Universidad Tecnol\'ogica Nacional, Argentina}
+
+\authornote{\addORCIDlink{}{}
+El autor es investigador independiente, estudiante de la Tecnicatura Universitaria en
+Programaci\'on (TUP) de la Universidad Tecnol\'ogica Nacional (UTN), Argentina, y egresado de
+su Diplomatura en Inteligencia Artificial. La correspondencia relativa a este art\'iculo debe
+dirigirse a Maximiliano Speranza. Correo electr\'onico: maximiliano.speranza@gmail.com.
+El criterio de detenci\'on analizado aqu\'i fue pre-registrado y congelado con un DOI
+\emph{antes} de recolectar dato alguno, lo que descarta la selecci\'on post hoc del criterio
+como explicaci\'on del defecto que se reporta. El autor declara no tener conflictos de inter\'es
+y no haber recibido financiamiento para este trabajo. El c\'odigo, los historiales de validaci\'on
+almacenados y el script de an\'alisis est\'an disponibles p\'ublicamente (v\'ease Pr\'acticas
+Abiertas).}
+
+\abstract{%
+Las comparaciones entre arquitecturas de modelado eficiente de secuencias suelen detener el
+entrenamiento con una regla de la forma ``la mejora de la exactitud de validaci\'on en los
+\'ultimos $w$ pasos es menor que una tolerancia $\tau$'', y luego otorgan a cada arquitectura el
+presupuesto resultante. Analizamos una regla de ese tipo, pre-registrada y congelada con un DOI
+antes de recolectar datos, y mostramos que no pod\'ia detectar convergencia: no porque su
+tolerancia estuviera mal calibrada, sino porque la decisi\'on de detenci\'on se tomaba por debajo
+del piso de se\~nal-ruido de la medici\'on. En una tarea de recuperaci\'on asociativa
+multiconsulta, la condici\'on de atenci\'on lineal con regla delta mejoraba a raz\'on de $0.31$
+puntos de exactitud por evaluaci\'on en el r\'egimen tratado como meseta (pendiente positiva en
+siete de ocho semillas; $t = 4.20$, $p = .004$), mientras que el ruido de la diferencia evaluada
+era de $1.16$ puntos, lo que da una relaci\'on se\~nal-ruido de $0.27$. Bajo esa relaci\'on
+ninguna tolerancia separa los dos errores de inter\'es: las reglas que detectan una meseta
+tambi\'en detienen el entrenamiento durante una mejora genuina. Mostramos que un remedio
+propuesto ---medias de ventana con tolerancia calibrada al ruido--- tiene una tasa de detecci\'on
+fijada algebraicamente en $\Phi(2)$ con independencia de la ventana, y habr\'ia declarado
+convergencia mientras el modelo a\'un mejoraba con probabilidad $.73$. Al descomponer la ganancia
+alcanzable, un factor de $7.0$ proviene de alargar la ventana de comparaci\'on y solo $1.31$ de
+reemplazar la diferencia de dos puntos por una prueba de tendencia. La falla depende de la
+arquitectura: las condiciones que saturan exhiben un ruido tres \'ordenes de magnitud menor y
+cierran de inmediato, de modo que el presupuesto compartido covar\'ia con la cantidad que se
+compara. Ofrecemos una regla basada en potencia para elegir $w$, pre-registrable sin datos
+piloto. Todos los an\'alisis reutilizan historiales de validaci\'on ya almacenados y no requieren
+entrenamiento adicional.}
+
+\keywords{criterio de detenci\'on, detenci\'on temprana, potencia estad\'istica,
+pre-registro, atenci\'on lineal, recuperaci\'on asociativa, presupuesto de entrenamiento,
+reproducibilidad}
+
+\begin{document}
+\maketitle
+
+\section{Introducci\'on}
+
+Las comparaciones entre arquitecturas de modelado eficiente de secuencias descansan sobre una
+decisi\'on que rara vez se examina: cu\'ando detener el entrenamiento. Una pr\'actica habitual
+consiste en entrenar una arquitectura de referencia hasta que se dispara una regla de
+convergencia y luego otorgar a cada arquitectura competidora el mismo n\'umero de pasos
+\parencite{li2019budgeted}. El procedimiento es v\'alido solo si la convergencia puede detectarse
+de manera confiable. Si la detecci\'on no lo es, el presupuesto compartido hereda esa falta de
+confiabilidad, y la comparaci\'on tambi\'en.
+
+Este art\'iculo reporta un caso en el que la detecci\'on era imposible por construcci\'on, y
+caracteriza por qu\'e. El escenario es una comparaci\'on pre-registrada de composiciones de
+cabezas de atenci\'on sobre recuperaci\'on asociativa multiconsulta
+\parencite[MQAR, por sus siglas en ingl\'es;][]{arora2023zoology}. La regla de detenci\'on fue
+especificada, congelada y publicada con un DOI antes de entrenar modelo alguno. Eso importa para
+el argumento que se desarrolla aqu\'i: el defecto no puede atribuirse a una regla elegida
+despu\'es de ver los resultados, porque la regla no pudo haberse elegido despu\'es de verlos.
+
+Nuestro diagn\'ostico difiere del que sugerir\'ia inspeccionar la regla por s\'i sola. La
+tolerancia era, en efecto, menor que el ruido de la m\'etrica, y resulta tentador concluir que la
+regla med\'ia entonces ruido en lugar de convergencia. Esa conclusi\'on no sobrevive al contacto
+con los datos. El r\'egimen al que se aplic\'o la regla no era una meseta: la arquitectura de
+inter\'es a\'un mejoraba, a una tasa que una ventana m\'as larga habr\'ia detectado. La regla
+fall\'o porque la \emph{decisi\'on de detenci\'on} se tomaba por debajo del piso de se\~nal-ruido
+de la medici\'on, y ninguna elecci\'on de tolerancia repara una decisi\'on tomada bajo ese piso.
+
+Nuestra contribuci\'on tiene cuatro partes. Primero, mostramos que el r\'egimen tratado como
+convergido conten\'ia una tendencia de mejora estad\'isticamente detectable, de modo que el
+diagn\'ostico debe formularse en t\'erminos de se\~nal-ruido y no de tolerancia. Segundo,
+mostramos que recalibrar la tolerancia al ruido medido ---el remedio natural--- produce una tasa
+de detecci\'on fijada algebraicamente e independiente de la ventana, y compra poder de
+detecci\'on al costo de detenerse durante una mejora genuina. Tercero, descomponemos la ganancia
+alcanzable y encontramos que la longitud de la ventana domina a la elecci\'on del estad\'istico
+por un factor de cinco. Cuarto, mostramos que el ruido que impulsa todo esto depende de la
+arquitectura, lo que convierte una elecci\'on procedimental aparentemente neutra en una variable
+de confusi\'on alineada con la variable bajo estudio, y ofrecemos una regla basada en potencia
+para $w$ que es pre-registrable sin datos piloto.
+
+\section{El escenario pre-registrado}
+
+El experimento compara tres composiciones de cabezas en un transformer peque\~no
+($193\,493$ par\'ametros) sobre MQAR: \texttt{softmax} (atenci\'on est\'andar), \texttt{delta}
+(atenci\'on lineal con regla delta) y \texttt{mix22} (dos cabezas softmax y dos cabezas delta en
+la misma capa). La atenci\'on lineal con regla delta actualiza un estado asociativo de tama\~no
+fijo corrigiendo la lectura actual antes de escribir \parencite{yang2024gated}; se sabe que las
+composiciones h\'ibridas recuperan capacidad de recuerdo que las variantes puramente lineales no
+alcanzan \parencite{arora2023zoology,arora2024simple}.
+
+La exactitud de validaci\'on se evalu\'o cada $500$ pasos como la media de la exactitud top-1
+sobre las cargas $\{64, 96, 128\}$, con un conjunto de validaci\'on mantenido fijo entre
+evaluaciones mediante una semilla aleatoria fija. La regla pre-registrada, denominada D-004,
+declara convergencia en el paso $N$ cuando
+%
+\begin{equation}
+\mathrm{exac}(N) - \mathrm{exac}(N - w) < \tau ,
+\label{eq:d004}
+\end{equation}
+%
+con $w = 500$ y $\tau = 0.005$. Como las evaluaciones est\'an separadas por $500$ pasos, la
+Ecuaci\'on~\ref{eq:d004} compara dos evaluaciones \emph{consecutivas}. Una condici\'on cierra su
+primera fase de entrenamiento solo cuando las ocho semillas satisfacen la
+Ecuaci\'on~\ref{eq:d004}; de lo contrario el entrenamiento contin\'ua en bloques de $2\,500$
+pasos hasta un tope de $10\,000$. El presupuesto com\'un para la tabla de comparaci\'on primaria
+es entonces el m\'aximo de los puntos de convergencia por condici\'on, de modo que el
+comportamiento de detenci\'on de una condici\'on fija el presupuesto otorgado a todas.
+
+\section{M\'etodo}
+
+Todos los an\'alisis reutilizan historiales de validaci\'on almacenados durante la campa\~na
+original; ning\'un modelo fue reentrenado. Los datos comprenden ocho corridas de \texttt{delta},
+ocho de \texttt{mix22} y tres de \texttt{softmax}, m\'as una semilla de \texttt{delta} extendida a
+$10\,000$ pasos que se emplea solo donde se indica.
+
+\subsection{Estimaci\'on del ruido y de la tendencia}
+
+Para cada corrida aislamos el r\'egimen tard\'io de entrenamiento ---desde el paso $4\,000$ para
+\texttt{delta} y $1\,000$ para las condiciones que saturan--- y ajustamos una recta por m\'inimos
+cuadrados de la exactitud de validaci\'on contra el \'indice de evaluaci\'on. Estimamos el ruido
+por dos m\'etodos: la desviaci\'on est\'andar de los residuos de ese ajuste, y la desviaci\'on
+est\'andar de las diferencias sucesivas dividida por $\sqrt{2}$. El segundo es insesgado bajo una
+tendencia lineal y sirve, por lo tanto, como control del primero. La cantidad que gobierna la
+Ecuaci\'on~\ref{eq:d004} es la desviaci\'on est\'andar de la diferencia evaluada,
+$\sigma_D = \sigma\sqrt{2}$.
+
+La tendencia se contrasta por corrida mediante la pendiente $b$ de m\'inimos cuadrados frente a
+$H_0\colon b = 0$, a una cola, y entre corridas mediante una prueba $t$ de una muestra sobre las
+ocho pendientes.
+
+\subsection{Probabilidad de detecci\'on}
+
+Reportamos dos estimaciones. La estimaci\'on param\'etrica modela las observaciones tard\'ias
+como $\mathrm{exac}(N) = \mu + \varepsilon$ con $\varepsilon \sim \mathcal{N}(0, \sigma^2)$, lo
+que da $P = \Phi(\tau / \sigma_D)$ para una semilla y $P^{k}$ para $k$ semillas independientes.
+La estimaci\'on no param\'etrica aprovecha que la Ecuaci\'on~\ref{eq:d004}, con $w$ igual al
+intervalo de evaluaci\'on, \emph{es} una diferencia sucesiva: reportamos entonces la fracci\'on
+observada de diferencias sucesivas menores que $\tau$, lo que no exige supuesto distribucional
+alguno ni supuesto de independencia.
+
+\section{Resultados}
+
+\subsection{El ruido de la m\'etrica depende de la arquitectura}
+
+La Tabla~\ref{tab:ruido} reporta el ruido tard\'io por condici\'on. Los dos estimadores coinciden
+dentro del $1\%$, lo que adem\'as indica que la autocorrelaci\'on residual es despreciable
+(v\'ease Control de supuestos). La cantidad decisiva es $\tau / \sigma_D$: por debajo de $1$, la
+tolerancia no puede resolver el ruido de la cantidad contra la que se la compara.
+
+\begin{table}[htbp]
+\caption{Ruido tard\'io de la exactitud de validaci\'on por condici\'on}
+\label{tab:ruido}
+\small
+\begin{tabular}{lccccc}
+\toprule
+Cond. & $n$ & $\sigma_{\text{resid}}$ & $\sigma_{\text{dif}}$ & $\sigma_D$ & $\tau/\sigma_D$ \\
+\midrule
+\texttt{delta}   & 8 & 0.00821 & 0.00829 & 0.01162 & 0.43 \\
+\texttt{mix22}   & 8 & 0.00004 & 0.00004 & 0.00006 & 86.9 \\
+\texttt{softmax} & 3 & 0.00004 & 0.00004 & 0.00006 & 88.8 \\
+\bottomrule
+\end{tabular}
+
+\vspace{5pt}
+{\small\raggedright \textit{Nota.} $\sigma_D = \sigma_{\text{resid}}\sqrt{2}$ es la desviaci\'on
+est\'andar de la diferencia evaluada por la Ecuaci\'on~\ref{eq:d004}. Las estimaciones usan ocho
+evaluaciones tard\'ias por corrida para \texttt{delta} y cuatro para las condiciones que saturan;
+los cocientes de estas \'ultimas deben leerse como ``dos \'ordenes de magnitud o m\'as'', no como
+valores precisos.
+\par}
+\end{table}
+
+Las tres condiciones difieren en $\sigma$ por unos tres \'ordenes de magnitud. Una \'unica
+tolerancia fija resulta as\'i altamente informativa para dos de ellas e inservible para la
+tercera.
+
+\subsection{El r\'egimen no es una meseta}
+
+Antes de preguntar si la regla detecta convergencia, preguntamos si hab\'ia convergencia que
+detectar. La Tabla~\ref{tab:tend} contrasta la tendencia en el r\'egimen al que se aplic\'o la
+regla.
+
+\begin{table}[htbp]
+\caption{Prueba de tendencia en el r\'egimen tratado como convergido (pasos 4\,000--7\,500)}
+\label{tab:tend}
+\small
+\begin{tabular}{lrrrrc}
+\toprule
+Semilla & $b$ & $t$ & $p$ & Mejora & D-004 \\
+\midrule
+0 & $+0.00259$ & 1.86 & .056 & $+1.81$ & s\'i \\
+1 & $+0.00234$ & 1.72 & .068 & $+1.64$ & no \\
+2 & $+0.00421$ & 2.54 & .022 & $+2.95$ & s\'i \\
+3 & $+0.00334$ & 5.12 & .001 & $+2.34$ & no \\
+4 & $-0.00014$ & $-0.12$ & .547 & $-0.10$ & s\'i \\
+5 & $+0.00445$ & 3.58 & .006 & $+3.11$ & no \\
+6 & $+0.00141$ & 1.37 & .110 & $+0.98$ & s\'i \\
+7 & $+0.00680$ & 4.13 & .003 & $+4.76$ & no \\
+\bottomrule
+\end{tabular}
+
+\vspace{5pt}
+{\small\raggedright \textit{Nota.} $b$ es la pendiente de m\'inimos cuadrados por evaluaci\'on;
+los valores $p$ son a una cola contra $H_0\colon b = 0$. ``Mejora'' es el incremento ajustado en
+puntos de exactitud a lo largo de los $3\,500$ pasos de la ventana. La \'ultima columna indica
+si la Ecuaci\'on~\ref{eq:d004} declar\'o convergencia en el paso $7\,500$.
+\par}
+\end{table}
+
+La pendiente es positiva en siete de ocho semillas, con media $+0.00312$ por evaluaci\'on; una
+prueba $t$ de una muestra sobre las ocho pendientes rechaza el cero, $t(7) = 4.20$, $p = .004$.
+Extrapolar la pendiente media predice $+1.56$ puntos de exactitud entre los pasos $7\,500$ y
+$10\,000$. La \'unica semilla efectivamente extendida a $10\,000$ gan\'o $+1.39$ puntos de
+capacidad en la carga~96 ($0.9167 \rightarrow 0.9306$), en concordancia con la proyecci\'on.
+
+Esto reencuadra el problema. La condici\'on \texttt{delta} no hab\'ia convergido a los $7\,500$
+pasos. Llevarla al tope de pasos no fue un artefacto de una regla ruidosa: fue el resultado
+correcto alcanzado por la raz\'on equivocada. No puede reproch\'arsele a la regla no haber
+detectado una convergencia que no hab\'ia ocurrido, pero tampoco puede acredit\'arsele nada,
+puesto que la Tabla~\ref{tab:tend} muestra que sus clasificaciones no guardan relaci\'on
+confiable con la tendencia medida.
+
+\subsection{La decisi\'on se toma por debajo del piso de se\~nal-ruido}
+
+Ahora pueden compararse las dos cantidades de manera directa. La se\~nal disponible para la
+Ecuaci\'on~\ref{eq:d004} es un intervalo de evaluaci\'on de mejora, $b = 0.00312$; el ruido de la
+diferencia evaluada es $\sigma_D = 0.01162$. Su cociente es
+%
+\begin{equation}
+\mathrm{SNR} = \frac{b}{\sigma_D} = 0.27 .
+\label{eq:snr}
+\end{equation}
+%
+Este \'unico n\'umero gobierna todo lo que sigue. Una regla de detenci\'on debe equilibrar dos
+errores: seguir entrenando despu\'es de la convergencia, y detenerse cuando a\'un queda mejora.
+Con $\mathrm{SNR} < 1$ las dos tasas de error no pueden separarse mediante ninguna elecci\'on de
+$\tau$, porque las distribuciones que se discriminan se solapan casi por completo. La selecci\'on
+de la tolerancia no es la palanca; solo desliza una frontera de decisi\'on a lo largo de un eje
+sobre el cual las dos hip\'otesis no son distinguibles.
+
+\subsection{Probabilidad de detecci\'on}
+
+Para \texttt{delta}, el modelo param\'etrico da $P = \Phi(0.43) = .667$ por semilla y
+$P^{8} = .039$ para las ocho simult\'aneamente. La estimaci\'on no param\'etrica ---la fracci\'on
+observada de diferencias sucesivas menores que $\tau$ en el mismo r\'egimen, $N = 56$--- da
+$P = .554$, IC 95\% $[.423, .684]$, y $P^{8} = .009$. La estimaci\'on no param\'etrica es
+preferible: no supone nada y ajusta mejor a lo observado. Cuatro de ocho semillas fueron
+clasificadas como convergidas; el conteo esperado es $4.4$ bajo la estimaci\'on no param\'etrica
+($P(X \leq 4) = .52$) frente a $5.3$ bajo la param\'etrica ($P(X \leq 4) = .26$).
+
+En cualquiera de los dos casos, la condici\'on ten\'ia menos de un $4\%$ de probabilidad de
+cerrar alguna vez su fase por convergencia, lo que aqu\'i es el resultado correcto ---puesto que
+no hab\'ia convergido---, pero habr\'ia sido igualmente cierto si hubiera convergido.
+
+\subsection{Recalibrar la tolerancia no resuelve el problema}
+
+El remedio natural consiste en comparar medias de ventana en lugar de puntos, y fijar la
+tolerancia a partir del ruido medido:
+%
+\begin{equation}
+\overline{\mathrm{exac}}_{\text{\'ultimas } m} - \overline{\mathrm{exac}}_{\text{previas } m}
+< c\,\sigma_D^{(m)}, \qquad \sigma_D^{(m)} = \sigma\sqrt{2/m} .
+\label{eq:fix}
+\end{equation}
+%
+Con $m = 3$ y $c = 2$, la probabilidad de detecci\'on conjunta sube de $.039$ a $.832$. Esa cifra
+no es evidencia de una regla mejor. Fijar la tolerancia en $c\,\sigma_D^{(m)}$ hace que la tasa de
+detecci\'on por semilla sea igual a $\Phi(c)$ \emph{id\'enticamente}, para cualquier $m$ y
+cualquier $\sigma$: con $c = 2$ vale $\Phi(2) = .977$ sea cual fuere la ventana. La
+Tabla~\ref{tab:desc} separa los dos ingredientes sobre nuestros datos. Toda la ganancia proviene
+de relajar la tolerancia, no de promediar en ventanas.
+
+\begin{table*}[htbp]
+\caption{Descomposici\'on de la ganancia en detecci\'on}
+\label{tab:desc}
+\begin{tabular}{lccc}
+\toprule
+Variante & $\tau$ & $\sigma_D$ & $P^{8}$ \\
+\midrule
+D-004 tal como se pre-registr\'o          & 0.0050 & 0.01162 & .039 \\
+Solo ventana ($m = 3$, $\tau$ fija)       & 0.0050 & 0.00671 & .126 \\
+Solo tolerancia recalibrada ($2\sigma_D$) & 0.0232 & 0.01162 & .832 \\
+Ecuaci\'on~\ref{eq:fix} completa          & 0.0134 & 0.00671 & .832 \\
+\bottomrule
+\end{tabular}
+
+\vspace{5pt}
+{\small\raggedright \textit{Nota.} $P^{8}$ es la probabilidad de que las ocho semillas sean
+declaradas convergidas simult\'aneamente estando en una meseta. Las dos \'ultimas filas coinciden
+porque fijar $\tau = 2\sigma_D$ deja la tasa por semilla en $\Phi(2)$ con independencia de la
+ventana.
+\par}
+\end{table*}
+
+El costo de esa relajaci\'on es el error que la tasa de detecci\'on no mide. Bajo una tasa de
+mejora real $b$, la probabilidad de que la Ecuaci\'on~\ref{eq:fix} declare convergencia de todos
+modos es $\Phi\!\left(c - b\,m/\sigma_D^{(m)}\right)$. A la tasa de mejora efectivamente medida,
+esa probabilidad es $.73$: la regla propuesta habr\'ia detenido a \texttt{delta} mientras a\'un
+ganaba alrededor de un punto de exactitud por ventana. Su mejora m\'inima detectable, con una
+tasa de detenci\'on espuria del $5\%$, es de $4.07$ puntos por bloque de $2\,500$ pasos: mayor
+que la ganancia de $1.39$ puntos que la semilla extendida realiz\'o efectivamente en un bloque de
+ese tama\~no. Una regla ajustada para detectar mesetas de manera confiable en este r\'egimen es,
+necesariamente, una regla que se detiene durante el progreso real.
+
+\subsection{La longitud de la ventana domina al estad\'istico}
+
+Lo que s\'i eleva el piso es la ventana. Para $n$ evaluaciones equiespaciadas, la pendiente de
+m\'inimos cuadrados tiene error est\'andar
+%
+\begin{equation}
+\mathrm{EE}(b) = \sigma \sqrt{\frac{12}{n(n^{2}-1)}} ,
+\label{eq:se}
+\end{equation}
+%
+que decrece como $n^{-3/2}$, frente a $n^{-1/2}$ del promediado. En nuestros datos, con $n = 8$
+evaluaciones, $\mathrm{EE}(b) = 0.00127$ y la pendiente media medida arroja $t = 2.46$: los mismos
+ocho puntos que dejan a la Ecuaci\'on~\ref{eq:d004} en $\mathrm{SNR} = 0.27$ sostienen la
+detecci\'on cuando se los usa conjuntamente. La ganancia total de $9.2\times$ se descompone en
+$7.0\times$ por comparar puntos separados por siete evaluaciones en lugar de una, y $1.31\times$
+por usar el estad\'istico de tendencia en lugar de la diferencia entre extremos. La longitud de
+la ventana ---no la elecci\'on del estad\'istico ni la tolerancia--- es el t\'ermino dominante.
+
+De aqu\'i se obtiene una regla que puede fijarse de antemano. Dada una tasa m\'inima de mejora
+$b^{*}$ que el estudio se compromete a no pasar por alto, un nivel $\alpha$ a una cola y una
+potencia $1 - \beta$, la ventana debe satisfacer
+%
+\begin{equation}
+b^{*} \geq (z_{\alpha} + z_{\beta})\, \sigma \sqrt{\frac{12}{n(n^{2}-1)}} .
+\label{eq:power}
+\end{equation}
+%
+La Tabla~\ref{tab:pot} eval\'ua la Ecuaci\'on~\ref{eq:power} al nivel de ruido medido aqu\'i.
+Muestra lo que el dise\~no original habr\'ia requerido: detectar una mejora de un punto de
+exactitud por cada $2\,500$ pasos exige unas once evaluaciones, mientras que D-004 us\'o dos.
+
+\begin{table}[htbp]
+\caption{Mejora detectable en funci\'on de la longitud de la ventana}
+\label{tab:pot}
+\small
+\begin{tabular}{cccc}
+\toprule
+$n$ & Ventana & $\mathrm{EE}(b)$ & $b^{*}$ \\
+\midrule
+4  & 1\,500 & 0.00367 & 4.56 \\
+6  & 2\,500 & 0.00196 & 2.44 \\
+8  & 3\,500 & 0.00127 & 1.58 \\
+10 & 4\,500 & 0.00090 & 1.12 \\
+12 & 5\,500 & 0.00069 & 0.85 \\
+16 & 7\,500 & 0.00045 & 0.55 \\
+20 & 9\,500 & 0.00032 & 0.40 \\
+\bottomrule
+\end{tabular}
+
+\vspace{5pt}
+{\small\raggedright \textit{Nota.} $n$ = cantidad de evaluaciones en la ventana; ``Ventana'' es
+su extensi\'on en pasos de entrenamiento. $\sigma = 0.00821$, $\alpha = .05$ a una cola,
+potencia $= .80$. $b^{*}$ es la m\'inima tasa de mejora detectable con esa potencia, en puntos de
+exactitud por cada $2\,500$ pasos.
+\par}
+\end{table}
+
+La Ecuaci\'on~\ref{eq:power} requiere $\sigma$, que no se conoce antes de entrenar. Dos caminos
+evitan la circularidad. Cuando el conjunto de validaci\'on se remuestrea en cada evaluaci\'on, el
+error de muestreo aporta una cota inferior anal\'itica,
+$\sigma \geq \sqrt{p(1-p)/n_{\text{val}}}$, calculable en tiempo de dise\~no. Cuando se lo
+mantiene fijo, como aqu\'i, ese t\'ermino se anula y el ruido residual es variabilidad del
+optimizador, que debe medirse; basta un piloto corto sobre cualquiera de las condiciones y, a
+diferencia de recalibrar una tolerancia despu\'es de ver los resultados, lo que se fija es una
+ventana, no un veredicto.
+
+\subsection{Propagaci\'on al presupuesto de entrenamiento}
+
+Como la regla fija el presupuesto com\'un, su dependencia de la arquitectura no es neutra. Las
+condiciones que saturan tienen $\tau/\sigma_D \approx 87$ y cierran en la primera oportunidad; la
+condici\'on que no satura a\'un mejora y es llevada al tope. Cualquiera sea el presupuesto que se
+adopte entonces, o bien resulta insuficiente para la condici\'on que sigue aprendiendo, o bien
+excede con creces lo que necesitan las que saturan, y \emph{cu\'al de las dos cosas ocurre lo
+deciden las condiciones que saturan}. El presupuesto otorgado covar\'ia as\'i con el desempe\~no
+en la tarea: precisamente la cantidad bajo comparaci\'on.
+
+La magnitud es relevante. El margen de decisi\'on pre-registrado para la hip\'otesis primaria era
+de $2$ puntos de exactitud; la semilla extendida de $7\,500$ a $10\,000$ pasos gan\'o $1.39$
+puntos de capacidad en la carga~96. Una diferencia inducida por el presupuesto del mismo orden
+que el margen de decisi\'on no es una cuesti\'on de redondeo. Esta estimaci\'on descansa sobre una
+\'unica semilla extendida y es indicativa m\'as que concluyente; el an\'alisis de tendencia de la
+Tabla~\ref{tab:tend}, que usa las ocho, respalda la misma direcci\'on y magnitud.
+
+\subsection{Control de supuestos}
+\label{sec:assump}
+
+\paragraph{Autocorrelaci\'on residual.} La autocorrelaci\'on de rezago 1 de los residuos sin
+tendencia es negativa en siete de ocho corridas, con mediana $-0.315$, lo que invita a corregir
+$\mathrm{Var}(D)$. La correcci\'on ser\'ia espuria. Con $n = 8$ puntos y una tendencia ajustada
+removida, el estimador de rezago 1 est\'a fuertemente sesgado hacia abajo incluso bajo ruido
+blanco: una simulaci\'on bajo ruido blanco ($20\,000$ r\'eplicas) da
+$E[\hat\rho_1] = -0.287$, con intervalo del 95\% $[-0.803, +0.310]$, lo que ubica la mediana
+observada en el percentil $49$ de la distribuci\'on nula. Este es el sesgo de muestra peque\~na
+de los estimadores de autocorrelaci\'on \parencite{marriott1954bias}. Los datos contienen un
+control independiente: si $\rho_1 = -0.315$ fuera real,
+$\sigma_{\text{dif}}/\sigma_{\text{resid}}$ deber\'ia valer $\sqrt{1-\rho_1} = 1.147$; el cociente
+observado es $1.010$, lo que implica $\rho_1 = -0.02$. Tratamos entonces a los residuos como
+serialmente no correlacionados. Se\~nalamos el punto porque la correcci\'on tentadora corre en la
+direcci\'on que favorece al argumento, y se habr\'ia reportado como respaldo suyo.
+
+\paragraph{Origen del ruido.} El conjunto de validaci\'on se mantiene fijo entre evaluaciones
+mediante una semilla fija y comprende alrededor de $37\,000$ consultas; el error de remuestreo
+aportar\'ia $\sigma \approx 0.0018$ y, al estar fijo, no aporta nada. El $\sigma = 0.0082$ medido
+es por lo tanto atribuible a la variabilidad del optimizador y no al error de medici\'on.
+Agrandar el conjunto de validaci\'on no lo reducir\'ia; promediar en el tiempo o promediar pesos,
+s\'i.
+
+\paragraph{Elecci\'on del inicio del r\'egimen.} Variar el inicio entre los pasos $2\,500$ y
+$5\,000$ deja $\tau/\sigma_D$ entre $0.39$ y $0.51$, siempre muy por debajo de la unidad, y no
+altera el signo ni la significaci\'on de la tendencia.
+
+\paragraph{\textquestiondown Sigue la exactitud de validaci\'on a la cantidad de inter\'es?} Entre las ocho
+semillas de \texttt{delta}, la exactitud de validaci\'on final correlaciona con la capacidad en
+la carga~96 a $r = .96$ y en la carga~128 a $r = .99$. La m\'etrica no es ciega al eje bajo
+estudio; es ruidosa en relaci\'on con su propia tasa de cambio. El problema es de potencia, no de
+constructo.
+
+\section{Discusi\'on}
+
+\subsection{Implicancias}
+
+El costo pr\'actico de una regla de detenci\'on por debajo del piso de ruido no es en primer
+lugar el c\'omputo desperdiciado, aunque en nuestra campa\~na alrededor del $80\%$ del
+presupuesto proyectado era atribuible a ella. El costo serio es que el presupuesto de
+entrenamiento pasa a ser funci\'on del ruido de la m\'etrica, que a su vez es funci\'on de d\'onde
+se sit\'ua la arquitectura respecto de la tarea. Las arquitecturas que saturan se detienen
+temprano; las que est\'an en el r\'egimen intermedio interesante son llevadas al tope. Toda
+comparaci\'on trazada a trav\'es de esa asimetr\'ia queda confundida, y la confusi\'on est\'a
+alineada con la variable que el estudio existe para medir.
+
+El episodio deja adem\'as una lecci\'on sobre el pre-registro. Congelar una regla de detenci\'on
+es buena pr\'actica, pero una regla congelada sin an\'alisis de potencia congela un supuesto no
+examinado sobre el ruido de la m\'etrica. Nuestro pre-registro fij\'o $\tau$ y $w$ y no dijo nada
+sobre $\sigma$; lo que deber\'ia haberse registrado en su lugar es la Ecuaci\'on~\ref{eq:power},
+puesto que enuncia qu\'e se compromete el estudio a detectar en vez de c\'omo calcular\'a una
+diferencia. Este es el an\'alogo, para las decisiones tomadas durante el entrenamiento, de
+registrar un tama\~no de efecto objetivo en lugar de un umbral de $p$.
+
+\subsection{Relaci\'on con trabajos previos}
+
+Que la detenci\'on temprana basada en validaci\'on es inestable en reg\'imenes ruidosos est\'a
+establecido \parencite{prechelt1998automatic}, como lo est\'a la necesidad de controlar el
+presupuesto de entrenamiento al comparar arquitecturas \parencite{li2019budgeted}, y se ha
+mostrado que el ruido de muestreo de semillas afecta la confiabilidad de los \emph{benchmarks}
+sint\'eticos \parencite{chanin2026reliable}. La contribuci\'on espec\'ifica de este trabajo es la
+cadena que los vincula y su cuantificaci\'on: una decisi\'on de detenci\'on tomada por debajo del
+piso de se\~nal-ruido, un piso que difiere en tres \'ordenes de magnitud entre las arquitecturas
+comparadas, y una regla de presupuesto que transmite esa diferencia a la comparaci\'on.
+Reportamos adem\'as, como detalle de advertencia, que las dos reparaciones naturales ---recalibrar
+la tolerancia al ruido medido y promediar sobre una ventana--- atacan el t\'ermino menor y dejan
+intacto el dominante.
+
+\subsection{Limitaciones}
+
+Este es un caso \'unico documentado, no un estudio general. Involucra una familia de tareas
+(MQAR), una escala de modelo ($193$K par\'ametros), una plataforma de hardware, tres condiciones
+y ocho semillas por condici\'on. No afirmamos que las reglas de tolerancia fija fallen en
+general, ni que alg\'un resultado publicado quede invalidado por este mecanismo. La estimaci\'on
+del efecto de presupuesto en la carga~96 descansa sobre una \'unica semilla extendida; el
+an\'alisis de tendencia que la corrobora usa las ocho, pero extrapola m\'as all\'a del rango
+observado. La regla de potencia de la Ecuaci\'on~\ref{eq:power} supone una tendencia de mejora
+aproximadamente lineal y ruido homoced\'astico a lo largo de la ventana, lo que es una
+aproximaci\'on para la din\'amica tard\'ia de entrenamiento y fallar\'ia cerca de una transici\'on
+abrupta. Por \'ultimo, la Ecuaci\'on~\ref{eq:power} se deriva aqu\'i y se valida solo de manera
+retrospectiva; su validaci\'on prospectiva queda como trabajo futuro y es el paso natural
+siguiente de esta l\'inea.
+
+\subsection{Recomendaciones}
+
+Sugerimos cuatro pr\'acticas econ\'omicas. Primera: antes de fijar una regla de detenci\'on,
+enunciar la m\'inima tasa de mejora que el estudio se compromete a detectar, y dimensionar la
+ventana a partir de ella con la Ecuaci\'on~\ref{eq:power}; reportar la potencia resultante.
+Segunda: reportar $\tau/\sigma_D$ y no $\tau$ a secas, puesto que la tolerancia es ininterpretable
+sin el ruido de la cantidad contra la que se la compara. Tercera: reportar el ruido por
+condici\'on, ya que una regla adecuada para una arquitectura puede ser inservible para otra
+dentro del mismo estudio, y esa asimetr\'ia es una variable de confusi\'on y no un inconveniente.
+Cuarta: cuando se relaje una regla para elevar su tasa de detecci\'on, reportar el error
+complementario ---la probabilidad de detenerse ante la m\'inima mejora que importa---, porque la
+tasa de detecci\'on por s\'i sola siempre puede llevarse al valor que se desee.
+
+\section{Conclusi\'on}
+
+Una regla de detenci\'on compara una mejora contra una tolerancia, pero lo que determina si puede
+funcionar no es ninguna de esas cantidades por separado: es el cociente entre la mejora acumulada
+a lo largo de la ventana de comparaci\'on y el ruido de esa comparaci\'on. Cuando ese cociente
+est\'a por debajo de la unidad, la regla informa hacia qu\'e lado cay\'o la \'ultima evaluaci\'on,
+y ninguna tolerancia recupera la decisi\'on. Alargar la ventana s\'i lo hace, y a una tasa que
+vuelve barata la correcci\'on. Cuando una regla as\'i fija adem\'as el presupuesto de
+entrenamiento compartido de una comparaci\'on entre arquitecturas, su sensibilidad al ruido
+---dependiente de la arquitectura--- convierte una elecci\'on procedimental en una variable de
+confusi\'on alineada con la variable bajo estudio. Diagnosticarlo no requiri\'o nada m\'as que los
+historiales de validaci\'on que ya se estaban almacenando, y corregirlo no requiere entrenamiento
+adicional.
+
+\section*{Pr\'acticas Abiertas}
+
+El pre-registro fue congelado y publicado antes de la recolecci\'on de datos
+(DOI:~10.5281/zenodo.21495252). El c\'odigo, los historiales de validaci\'on almacenados y el
+script de an\'alisis que reproduce las cifras reportadas est\'an disponibles en
+\url{https://github.com/SperanzaMax/telar-ligamento}; el an\'alisis corre en CPU en menos de un
+minuto. Debe consignarse una excepci\'on: la \'unica semilla de \texttt{delta} extendida a
+$10\,000$ pasos, citada una vez por su ganancia de capacidad de $1.39$ puntos, se perdi\'o por
+una ca\'ida de sesi\'on antes de poder versionarse, y es la \'unica cantidad de este art\'iculo
+que no puede recomputarse desde el repositorio. Toda otra cifra, incluido el an\'alisis de
+tendencia que predice esa ganancia de manera independiente, se deriva de las ocho corridas
+versionadas.
+
+\printbibliography
+
+\end{document}
