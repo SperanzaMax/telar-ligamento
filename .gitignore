@@ -50,3 +50,4 @@ preprint/*.log
 #     que la auditoria del 2026-07-27 demostro espurio). Se conserva local. ---
 preprint/criterio_convergencia.*
 preprint/revision_adversarial_prompt.txt
+envio_*.zip
