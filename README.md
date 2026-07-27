@@ -7,6 +7,15 @@ de confirmación de Maxi — alternativa ofrecida: «Lanzadera». Renombre = `mv
 
 **Ejecutor:** Claude Opus 4.8. **Diseño:** Fable 5 + Maxi.
 
+## Publicaciones
+
+- **Preprint metodológico (2026-07-27), ES + EN** — «Stopping Criteria Below the
+  Signal-to-Noise Floor: Window Length, Not Tolerance, Governs Convergence Detection in
+  Architecture Comparisons». DOI: [10.5281/zenodo.21630280](https://doi.org/10.5281/zenodo.21630280).
+  Fuentes en `preprint/`; auditoría que lo motivó en `AUDITORIA_PREPRINT_20260727.md`;
+  script que reproduce sus cifras en `experimentos/E1/auditoria_preprint.py` (CPU, <5 s).
+- **Pre-registro congelado (2026-07-22)** — DOI: [10.5281/zenodo.21495252](https://doi.org/10.5281/zenodo.21495252).
+
 ## Estado
 - **CONGELADO 2026-07-22 → `protocolo/PROTOCOLO_v1.0.md`.**
   SHA-256 `2f8ebb829ddcaf9de0b4409b44567e84eff52bd5fa62bf1233836b166712f7f1`
