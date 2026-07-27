@@ -11,7 +11,12 @@ de confirmación de Maxi — alternativa ofrecida: «Lanzadera». Renombre = `mv
 
 - **Preprint metodológico (2026-07-27), ES + EN** — «Stopping Criteria Below the
   Signal-to-Noise Floor: Window Length, Not Tolerance, Governs Convergence Detection in
-  Architecture Comparisons». DOI: [10.5281/zenodo.21630280](https://doi.org/10.5281/zenodo.21630280).
+  Architecture Comparisons».
+  DOI (todas las versiones): [10.5281/zenodo.21630279](https://doi.org/10.5281/zenodo.21630279) ·
+  versión vigente **v2**: [10.5281/zenodo.21631090](https://doi.org/10.5281/zenodo.21631090).
+  La v1 (`…21630280`) queda superada: sus PDF consignaban una afiliación institucional que
+  tergiversaba el vínculo del autor con la UTN — el trabajo se hizo de forma independiente,
+  sin auspicio ni supervisión. Ningún resultado difiere entre versiones.
   Fuentes en `preprint/`; auditoría que lo motivó en `AUDITORIA_PREPRINT_20260727.md`;
   script que reproduce sus cifras en `experimentos/E1/auditoria_preprint.py` (CPU, <5 s).
 - **Pre-registro congelado (2026-07-22)** — DOI: [10.5281/zenodo.21495252](https://doi.org/10.5281/zenodo.21495252).
