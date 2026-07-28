@@ -23,6 +23,25 @@ def _pad_to(x, y, T):
     return xp, yp
 
 
+def _bucket_T(T, t_max, n):
+    """Longitud a la que paddear: T redondeado hacia arriba en una grilla de `n` tramos.
+
+    El padding fijo a `t_max` desperdicia ~55% del cómputo: la secuencia real promedia 230
+    tokens y se rellena siempre hasta 514. Recortarlo es MATEMÁTICAMENTE neutro —el modelo es
+    estrictamente causal (tril en softmax, scan en delta, conv3 causal) y `loss_fn` enmascara
+    por `y >= 0`, así que el relleno va detrás de todo token real y no puede influirlo.
+
+    Se agrupa en buckets en vez de usar T exacto porque cada forma nueva dispara una
+    recompilación de JIT; con n=8 se captura casi todo el ahorro con 8 compilaciones.
+
+    OJO: neutro en aritmética exacta NO implica idéntico en float32. Cambiar la forma cambia
+    el tiling que elige XLA y con él el orden de las reducciones. Ver test_bucketing.py: si la
+    trayectoria diverge, activar esto obliga a reentrenar desde cero, no a seguir de un ckpt.
+    """
+    paso = -(-t_max // n)                      # techo de t_max/n
+    return min(t_max, -(-T // paso) * paso)    # techo de T/paso, en pasos de `paso`
+
+
 def loss_fn(params, x, y, kind):
     logits = forward(params, x, kind)
     mask = (y >= 0)
@@ -98,10 +117,14 @@ def _val_acc(params, kind, val_loads=(64, 96, 128), seed=7777, batch=64, reps=2)
 
 
 def train_resumable(cond, seed, target_steps, ckpt_path, max_load=128, lr=3e-3, batch=64,
-                    val_loads=(64, 96, 128), val_every=500, log_every=500):
+                    val_loads=(64, 96, 128), val_every=500, log_every=500, n_buckets=None):
     """Entrena hasta target_steps reanudando desde ckpt_path si existe (params + opt_state + rng + step +
     val_hist). Evalúa val-acc cada `val_every` pasos. Guarda checkpoint al terminar. Determinista por semilla:
-    train_resumable(...,N) == entrenar de corrido hasta N (mismos batches y estado). Devuelve (params, val_hist)."""
+    train_resumable(...,N) == entrenar de corrido hasta N (mismos batches y estado). Devuelve (params, val_hist).
+
+    `n_buckets` agrupa la longitud de secuencia en vez de paddear siempre a 4*max_load+2 (ver _bucket_T).
+    Por defecto None = comportamiento histórico, para no alterar nada de lo ya corrido. El sorteo de los
+    batches NO depende de esto: el rng se consume antes del padding, así que activarlo no cambia ni un dato."""
     import pickle, os as _os
     t_max = 4 * max_load + 2
     sched = optax.warmup_constant_schedule(0.0, lr, 100)
@@ -134,7 +157,8 @@ def train_resumable(cond, seed, target_steps, ckpt_path, max_load=128, lr=3e-3, 
             L = int(rng.integers(4, max_load + 1)); x, y, _ = gen_overwrite(rng, batch, L, r=max(1, L // 2))
         else:
             L = int(rng.integers(2, max_load + 1)); x, y = gen_mqar(rng, batch, L)
-        xp, yp = _pad_to(x, y, t_max)
+        T = t_max if n_buckets is None else _bucket_T(x.shape[1], t_max, n_buckets)
+        xp, yp = _pad_to(x, y, T)
         params, state, l, a = train_step(params, state, jnp.array(xp), jnp.array(yp), cond)
         if s % val_every == 0:
             va = _val_acc(params, cond, val_loads=val_loads)
