@@ -58,11 +58,17 @@ def _convergio(est_cond, seed):
 
 # ------------------------------------------------------------------ plan
 
-def plan(estado, conds, n_seeds):
+def plan(estado, conds, n_seeds, fase_max=None):
     """Lista ORDENADA de acciones pendientes hasta terminar la campaña.
 
     Acciones: ("entrenar", cond, seed, target_steps) | ("cerrar_faseA", cond, N_final) |
               ("informe", None, None, None)
+
+    `fase_max="A"` corta el plan al cerrar la fase A y NO encola la fase B. La fase B (B1 del
+    Anexo B: extender TODAS las condiciones hasta `N_common`, incluidas las ya convergidas) cuesta
+    ~30 h de T4 y consiste enteramente en sobre-entrenar condiciones saturadas. Es lo que manda el
+    prereg congelado, pero la enmienda E-003 propone justamente no hacerlo y está sin resolver: el
+    freno existe para que esas 30 h no se gasten por inercia de re-ejecutar la celda de sesión.
     """
     acciones = []
 
@@ -87,6 +93,9 @@ def plan(estado, conds, n_seeds):
 
     if any(a[0] == "entrenar" for a in acciones):
         return acciones                    # todavía en fase A: N_common no se puede fijar
+
+    if fase_max == "A":
+        return acciones                    # freno: cierra la fase A y no encola la B
 
     # ---- Fase B: todas las condiciones cerradas → extender hasta N_common
     # OJO: las condiciones que cierran su fase A en ESTA misma pasada todavía no tienen N_final en
@@ -160,9 +169,9 @@ def fmt(seg):
     return f"{h}h{m // 60:02d}m" if h else f"{m // 60}m{m % 60:02d}s"
 
 
-def resumen(estado, conds, n_seeds, costos, presupuesto_seg):
+def resumen(estado, conds, n_seeds, costos, presupuesto_seg, fase_max=None):
     """Texto de avance: qué está hecho, qué falta y cuántas sesiones más."""
-    acciones = plan(estado, conds, n_seeds)
+    acciones = plan(estado, conds, n_seeds, fase_max=fase_max)
     pend = [a for a in acciones if a[0] == "entrenar"]
     total_seg = sum(estimar_seg(a, costos) for a in pend)
     L = ["=== Avance de la campaña E1 ==="]
@@ -180,4 +189,9 @@ def resumen(estado, conds, n_seeds, costos, presupuesto_seg):
           f"{int(total_seg / presupuesto_seg) + (1 if total_seg % presupuesto_seg else 0)}"]
     if not pend and acciones and acciones[-1][0] == "informe":
         L.append("  ✓ CAMPAÑA COMPLETA — falta solo generar el informe.")
+    if fase_max == "A" and not pend and all(estado[c]["faseA_cerrada"] for c in conds):
+        L += ["", "  ⏸  FASE A COMPLETA · FRENO ACTIVO (FASE_MAX=A).",
+              "     La fase B (B1: extender TODAS las condiciones hasta N_common, incluidas las",
+              "     saturadas) NO se encoló. Cuesta ~30 h de T4 y es justo lo que la enmienda",
+              "     E-003 propone no hacer. Sacá FASE_MAX para largarla, con la decisión tomada."]
     return "\n".join(L)

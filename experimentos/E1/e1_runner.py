@@ -203,20 +203,22 @@ def main():
 
     MODO=sesion (defecto) | estado (solo informa) | informe (fuerza el agregado)
     PRESUPUESTO_MIN=210   (3.5 h; Colab free corta a las ~4 h)
+    FASE_MAX=A            (opcional) frena al cerrar la fase A, sin encolar la fase B
     """
     modo = os.environ.get("MODO", "sesion")
     presupuesto = float(os.environ.get("PRESUPUESTO_MIN", 210)) * 60
+    fase_max = os.environ.get("FASE_MAX") or None
 
     estado = pl.leer_estado(RESULTS, CONDS, N_SEEDS)
     costos = pl.costos_medidos(RESULTS, CONDS)
-    print(pl.resumen(estado, CONDS, N_SEEDS, costos, presupuesto), flush=True)
+    print(pl.resumen(estado, CONDS, N_SEEDS, costos, presupuesto, fase_max=fase_max), flush=True)
     if modo == "estado":
         return
     if modo == "informe":
         aggregate()
         return
 
-    acciones = pl.plan(estado, CONDS, N_SEEDS)
+    acciones = pl.plan(estado, CONDS, N_SEEDS, fase_max=fase_max)
     hacer, restan, seg_est = pl.sesion(acciones, presupuesto, costos)
     n_train = sum(1 for a in hacer if a[0] == "entrenar")
     print(f"\n=== SESIÓN · {n_train} unidades · ≈{pl.fmt(seg_est)} estimados · "
@@ -243,7 +245,11 @@ def main():
 
     estado = pl.leer_estado(RESULTS, CONDS, N_SEEDS)
     costos = pl.costos_medidos(RESULTS, CONDS)
-    print("\n" + pl.resumen(estado, CONDS, N_SEEDS, costos, presupuesto), flush=True)
+    print("\n" + pl.resumen(estado, CONDS, N_SEEDS, costos, presupuesto, fase_max=fase_max), flush=True)
+    if fase_max == "A" and all(estado[c]["faseA_cerrada"] for c in CONDS):
+        notify("⏸️ E1 FASE A COMPLETA. La fase B (~30 h, sobre-entrenar las saturadas hasta "
+               "N_common) NO arrancó: requiere decidir E-003 primero.")
+        return
     notify(f"⏸️ E1 sesión terminada ({pl.fmt(time.time() - t_ini)} de cómputo). "
            f"Volvé a ejecutar la celda para la siguiente.")
 
