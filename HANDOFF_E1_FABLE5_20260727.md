@@ -178,10 +178,24 @@ Sigue abierto y condiciona el encuadre (§7 del handoff del 26 y §6 del addendu
 2. **¿(a), (b) o (c) del §4?** Es la decisión que desbloquea el presupuesto de Fase 1. Mi
    postura: (a) con caída a (b).
 3. **Los cuatro puntos del §6**, que vienen arrastrados de dos rondas.
-4. **Una pregunta nueva de método:** el criterio de parada de un prereg, ¿debería declarar siempre
-   el δ\* que se compromete a detectar, en vez de una tolerancia? Si tu respuesta es sí, esto no
-   es solo una enmienda a Ligamento: es una regla para todos los preregs del programa TELAR, y
-   convendría escribirla como tal antes de congelar el próximo.
+4. **Una pregunta nueva de método — y no es hipotética, ya la respondimos en público.** El
+   criterio de parada de un prereg, ¿debería declarar siempre el δ\* que se compromete a detectar,
+   en vez de una tolerancia?
+
+   Corrijo cómo te planteé esto: no es una pregunta abierta. El preprint ya publicado
+   (`10.5281/zenodo.21630279`, CC-BY-4.0) lo afirma como **Recomendación 1**, textual:
+
+   > *«before fixing a stopping rule, state the smallest improvement rate the study commits to
+   > detecting, and size the window from it via Equation 6; report the resulting power.»*
+
+   Es decir: la regla ya está sostenida bajo DOI, con nuestro nombre, en las dos versiones
+   (ES y EN). Lo que te pido entonces no es evaluarla de cero sino **ratificarla como norma del
+   programa TELAR** antes de que congelemos el próximo prereg — y decidir si eso se escribe como
+   sección propia del protocolo o queda como práctica declarada caso por caso.
+
+   La asimetría importa: un «sí» solo hace explícito lo que ya publicamos. Un «no» obliga a una
+   v3 del preprint, porque estaríamos recomendando en público una práctica que el programa
+   internamente rechaza. Si tenés una objeción, este es el momento barato para tenerla.
 
 ---
 

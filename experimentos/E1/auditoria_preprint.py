@@ -102,7 +102,13 @@ for d_pts in [0.001, 0.002, 0.004, 0.006, 0.010]:
 mde = 2 * sD_win + 1.645 * sD_win
 print(f"  Mínima mejora detectable (P(falsa parada)<=0.05): {mde*100:.2f} pts por ventana "
       f"= {mde/3*100:.2f} pts/eval = {mde/3/500*2500*100:.2f} pts por bloque de 2500 pasos")
-print(f"  *** El efecto de presupuesto que el paper llama material es +1.45 pts en 2500 pasos. ***")
+# NOTA: 1.45 = 0.9306 - 0.9161, tomando como base la cifra REDONDEADA que cita el paper.
+# La cifra publicada es 1.39 = 0.9306 - 0.9167, con la base del JSON (e1_delta_seed0.json,
+# capacity.96.1 = 0.9167). La diferencia de 0.06 pts es el redondeo de la base, no una
+# discrepancia de medición: ambas quedan muy por debajo del piso de 4.07 pts, así que el
+# argumento del §4 no depende de cuál se use. Citar 1.39 en cualquier texto público.
+print(f"  *** El efecto de presupuesto que el paper llama material es +1.45 pts en 2500 pasos")
+print(f"      (1.39 con la base del JSON; ver nota en el código). ***")
 
 print("\n" + "=" * 78)
 print("5. ¿LA VAL_ACC SIGUE A LA CAPACIDAD? (delta, 8 semillas)")
