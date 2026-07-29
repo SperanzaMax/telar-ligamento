@@ -164,12 +164,22 @@ def informe():
 if __name__ == "__main__":
     print(f"=== Reproducibilidad entre backends · {COND} · semillas {SEEDS} · hasta {TARGET} ===")
     if MODO != "informe":
-        pend = [s for s in SEEDS if not os.path.exists(salida(s))]
+        def hecha(s):
+            """Ya está sólo si el resultado guardado llega al menos hasta TARGET."""
+            p = salida(s)
+            if not os.path.exists(p):
+                return False
+            return json.load(open(p)).get("target", 0) >= TARGET
+
+        pend = [s for s in SEEDS if not hecha(s)]
+        # el checkpoint retiene lo ya entrenado: solo se pagan los pasos que faltan
+        falta = sum(TARGET - (json.load(open(salida(s))).get("target", 0)
+                              if os.path.exists(salida(s)) else 0) for s in pend)
         print("referencia: corridas en Tesla T4 ya versionadas en resultados/E1/")
-        print(f"pendientes: {pend or 'ninguna'}  (~{len(pend)*TARGET*1.805/3600:.1f} h en esta CPU)\n")
+        print(f"pendientes: {pend or 'ninguna'}  ({falta} pasos ~{falta*2.28/3600:.1f} h en esta CPU)\n")
         for s in SEEDS:
-            if os.path.exists(salida(s)):
-                print(f"  seed{s}: ya está, se saltea", flush=True)
+            if hecha(s):
+                print(f"  seed{s}: ya está hasta {TARGET}, se saltea", flush=True)
                 continue
             correr(s)
     informe()
