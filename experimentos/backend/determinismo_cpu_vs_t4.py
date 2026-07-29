@@ -45,7 +45,13 @@ os.makedirs(CKPT_DIR, exist_ok=True)
 
 # hiperparámetros EXACTOS de e1_runner.py — cualquier diferencia acá invalida la comparación
 MAXLOAD, LR, VAL_LOADS = 128, 3e-3, (96, 128)
-SIGMA_SEMILLA = 0.01105           # SD de val_acc@7500 entre las 8 semillas de delta en T4
+
+# OJO (corregido 2026-07-29): antes acá había SIGMA_SEMILLA = 0.01105 fijo, que es la SD entre
+# semillas a 7500 pasos. Pero las diferencias de backend se miden en 500-2500, y la SD entre
+# semillas NO es constante: vale 0.101 en el paso 500 y recién baja a ~0.011 en 7500. Comparar
+# contra la SD tardía inflaba la razón backend/semilla de 1.30x a 3.00x. Ahora se calcula la SD
+# paso por paso desde las corridas de T4 y se compara cada paso contra la SD de ESE paso.
+SIGMA_TARDIA = 0.01105            # SD@7500, se conserva solo como referencia declarada
 
 
 def ref_hist(seed):
@@ -97,6 +103,16 @@ def correr(seed):
     return out
 
 
+def sd_por_paso():
+    """SD entre las 8 semillas en T4, calculada PASO POR PASO (no una SD global)."""
+    import glob
+    H = {}
+    for p in sorted(glob.glob(os.path.join(REF_DIR, f"e1_{COND}_seed*.json"))):
+        for h in json.load(open(p))["val_hist"]:
+            H.setdefault(h["step"], []).append(h["val_acc"])
+    return {s: float(np.std(v, ddof=1)) for s, v in H.items() if len(v) >= 3}
+
+
 def informe():
     datos = [json.load(open(salida(s))) for s in SEEDS if os.path.exists(salida(s))]
     if not datos:
@@ -104,16 +120,31 @@ def informe():
         return
     todas = np.concatenate([d["difs"] for d in datos])
     firmadas = np.concatenate([d["difs_firmadas"] for d in datos])
+    SD = sd_por_paso()
     print("\n" + "=" * 66)
     print(f"=== BACKEND vs SEMILLA · {COND} · {len(datos)}/{len(SEEDS)} semillas ===")
     print("=" * 66)
     print("  cambiar el DISPOSITIVO (T4 -> CPU, misma semilla):")
     print(f"     |dif| media = {todas.mean():.5f}   máx = {todas.max():.5f}   n = {len(todas)}")
-    print("  cambiar la SEMILLA (8 semillas en T4):")
-    print(f"     SD          = {SIGMA_SEMILLA:.5f}")
-    print(f"\n  razón backend/semilla = {todas.mean()/SIGMA_SEMILLA:.2f}x (media) · "
-          f"{todas.max()/SIGMA_SEMILLA:.2f}x (peor)")
-    print(f"  como fracción del margen R11 (0.0200): {100*todas.mean()/0.02:.0f}%")
+
+    # comparación PAREADA: cada paso contra la SD entre semillas de ESE paso
+    print("\n  pareado por paso (la SD entre semillas no es constante):")
+    print(f"     {'paso':>6} {'|dif| backend':>14} {'SD semillas':>12} {'razón':>7}")
+    razones = []
+    for s in sorted(SD):
+        difs = [abs(d["val_cpu"][d["pasos"].index(s)] - d["val_t4"][d["pasos"].index(s)])
+                for d in datos if s in d["pasos"]]
+        if not difs:
+            continue
+        m, sd = float(np.mean(difs)), SD[s]
+        razones.append(m / sd)
+        print(f"     {s:>6} {m:>14.5f} {sd:>12.5f} {m/sd:>6.2f}x")
+    if razones:
+        print(f"\n  razón backend/semilla = {np.mean(razones):.2f}x  (media de las razones por paso)")
+        print(f"  [referencia: contra la SD@7500 fija ({SIGMA_TARDIA:.5f}) daría "
+              f"{todas.mean()/SIGMA_TARDIA:.2f}x, pero eso compara ruido temprano con SD tardía]")
+    print(f"\n  |dif| media como fracción del margen R11 (0.0200): {100*todas.mean()/0.02:.0f}%")
+    print("  (ojo: R11 se aplica a comparaciones en N_common, no en el transitorio 500-2500)")
 
     # ¿hay sesgo sistemático del backend, o solo dispersión?
     n_neg = int((firmadas < 0).sum())
