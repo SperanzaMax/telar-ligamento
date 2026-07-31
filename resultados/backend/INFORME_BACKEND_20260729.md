@@ -90,3 +90,42 @@ El gate de T4 del notebook de E1 sigue justificado: aun a 1.30×, mezclar dispos
 una fuente de variación que el diseño no contempla, y el peor caso puntual (0.224 de diferencia
 en un checkpoint) es grande en términos absolutos. Lo que **no** se puede afirmar con estos
 datos es que el backend domine sobre la semilla.
+
+---
+
+## ACTUALIZACIÓN 2026-07-30: las 8 semillas hasta 7500 pasos
+
+La versión anterior medía hasta 2500, que es **régimen transitorio**, y ese límite estaba anotado
+como el principal. Se extendió a 7500 (28 h de CPU) y **el resultado cambia de signo**.
+
+```
+                     |dif| backend    SD semillas    razón
+transitorio  500-2500     0.03312       —            1.30x
+TARDÍO      3000-7500     0.00604       —            0.53x
+                          caída: 5.5x
+
+global (n=120): razón 0.81x · 64 negativos de 120
+t(7) = -1.42 · p = 0.1979  ->  sin sesgo detectable
+```
+
+**En el régimen donde se toman las decisiones, cambiar de backend mete la MITAD del ruido que
+cambiar la semilla**, y el `|dif|` medio vale el **30 % del margen R11**, no el 166 % que se
+reportó primero. Las trayectorias **convergen**: arrancan separadas por la aritmética distinta de
+cada dispositivo y se juntan a medida que el entrenamiento avanza.
+
+### Lo que esto significa
+
+1. **El efecto grande era del transitorio.** Medir reproducibilidad en checkpoints tempranos
+   sobreestima el problema en un orden de magnitud. Ese es el aporte metodológico transferible:
+   quien mida a 2500 pasos y publique «el hardware mete tanto ruido como la semilla» está
+   reportando un artefacto del régimen, no una propiedad del sistema.
+2. **La ausencia de sesgo se sostuvo** en las tres muestras (n=3, 4 y 8) y en los dos horizontes.
+   Es la conclusión más robusta del experimento.
+3. **El gate de T4 sigue siendo buena práctica**, pero por prolijidad, no porque el backend
+   domine: a 0.53× no domina nada.
+
+### Control que salió gratis
+
+seed0 no tenía checkpoint y se reentrenó desde cero. Dio `val_acc = 0.5182` en el paso 500,
+idéntico al `0.51822` de la corrida original: **la CPU es determinista consigo misma**. Las
+diferencias medidas vienen del cambio de backend, no de ruido de ejecución.
