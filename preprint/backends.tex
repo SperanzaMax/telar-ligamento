@@ -1,0 +1,212 @@
+\documentclass[jou,11pt,donotrepeattitle]{apa7}
+% APA 7th edition. Compilar:  latexmk -pdf backends.tex
+\usepackage[american]{babel}
+\usepackage{csquotes}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+
+\title{Hardware Reproducibility Noise Decays with Training: Measuring Backend
+Effects Early Overstates Them by an Order of Magnitude}
+\shorttitle{Backend Noise Decays with Training}
+\leftheader{Speranza}
+
+\author{Maximiliano Speranza}
+\affiliation{Independent Researcher, Argentina}
+
+\authornote{\addORCIDlink{Maximiliano Speranza}{0009-0005-0413-8554}
+This work was carried out independently, without institutional affiliation, supervision, or
+funding. The author is an undergraduate student of the University Technical Degree in
+Programming (\emph{Tecnicatura Universitaria en Programaci\'on}, TUP) at Universidad
+Tecnol\'ogica Nacional (UTN), Argentina; the programme neither sponsored nor supervised this
+study, which is reported here in a personal capacity. Correspondence concerning this article
+should be addressed to Maximiliano Speranza. E-mail: maximiliano.speranza@gmail.com.
+The author declares no competing interests and received no funding. Code, stored validation
+histories, and the script that reproduces every number reported here are publicly available
+(see Open Practices).}
+
+\abstract{%
+Retraining an identical model with an identical seed on a different compute backend yields a
+different validation curve, and it is often assumed that this irreproducibility is of the same
+order as the seed-to-seed variation that papers already report. We measure it directly. Eight
+seeds of a linear-attention model were trained to 7{,}500 steps on a Tesla T4 GPU and retrained
+on CPU with identical code, data, and seeds, yielding 120 paired comparisons. The mean absolute
+backend difference falls from $0.0331$ over steps 500--2{,}500 to $0.0060$ over steps
+3{,}000--7{,}500, a $5.5\times$ decay: trajectories start apart and converge. Relative to the
+between-seed standard deviation \emph{at the same step}, the backend term is $1.30\times$ in the
+transient but only $0.53\times$ in the late regime, where architecture decisions are actually
+taken. No directional bias is detectable ($t(7) = -1.42$, $p = .198$; 64 of 120 signed
+differences negative). The practical consequence is a measurement caveat rather than a
+reproducibility alarm: because between-seed noise is itself non-stationary---its standard
+deviation falls from $0.101$ at step 500 to $0.011$ at step 7{,}500, a factor of nine---any
+backend comparison anchored to a single global noise estimate is off by a large factor. We first
+made that error ourselves and reported an inflated ratio of $3.00\times$; the correction is
+documented here because the failure mode is easy to reproduce and hard to notice.}
+
+\keywords{reproducibility, floating-point non-determinism, hardware variability,
+early stopping, experimental methodology}
+
+\begin{document}
+\maketitle
+
+\section{The question}
+
+Two laboratories run the same code, with the same seed, on different GPUs, and obtain different
+numbers. This is uncontroversial: floating-point reductions are not associative, and kernel
+selection differs across devices. What is not established is \emph{how large} the resulting
+disagreement is relative to the variation that papers already quantify, namely the spread across
+random seeds. If the backend term were comparable to or larger than the seed term, then the
+customary ``mean $\pm$ SD over $N$ seeds'' would omit a term of the same order, and architecture
+comparisons whose reported margins are of that size would not be reproducible across machines.
+
+We tested this on a concrete system rather than in general, and the answer depends critically on
+\emph{when} the measurement is taken.
+
+\section{Method}
+
+The subject is condition \texttt{delta} of a pre-registered capacity experiment: a small
+linear-attention model (193{,}493 parameters) trained on a multi-query associative recall task,
+with validation accuracy evaluated every 500 steps at sequence loads 96 and 128. Eight seeds had
+already been trained to 10{,}000 steps on a Tesla T4 GPU under JAX, with
+\texttt{jax\_default\_matmul\_precision=highest}, \texttt{--xla\_gpu\_deterministic\_ops=true}
+and \texttt{TF\_CUDNN\_DETERMINISTIC=1}.
+
+Each seed was then retrained from scratch on CPU (Intel i3-7100, four threads) with identical
+code, identical data generation, and the identical seed, to 7{,}500 steps. This yields 15 paired
+evaluation points per seed and $8 \times 15 = 120$ paired comparisons. The comparison is
+\emph{within seed}: every CPU value is compared against the GPU value of the same seed at the
+same step, so the seed contribution is differenced out by construction.
+
+Two quantities are reported at each step $s$: the mean absolute backend difference
+$\overline{|d_s|} = \frac{1}{8}\sum_i |a^{\text{CPU}}_{i,s} - a^{\text{GPU}}_{i,s}|$, and the
+between-seed standard deviation of the GPU runs \emph{at that same step}, $\sigma_s$. Their ratio
+answers the question of interest: how much noise does changing the backend add, in units of the
+noise the field already reports?
+
+\section{Results}
+
+\subsection{The backend effect decays with training}
+
+\begin{table}[htbp]
+\caption{Backend difference and between-seed dispersion, by training step}
+\label{tab:main}
+\small
+\begin{tabular}{rccc}
+\toprule
+Step & $\overline{|d_s|}$ & $\sigma_s$ & Ratio \\
+\midrule
+500   & 0.0353 & 0.0972 & 0.36 \\
+1{,}000  & 0.0362 & 0.0702 & 0.52 \\
+1{,}500  & 0.0442 & 0.0371 & 1.19 \\
+2{,}000  & 0.0275 & 0.0092 & 2.98 \\
+2{,}500  & 0.0224 & 0.0133 & 1.68 \\
+3{,}000  & 0.0199 & 0.0112 & 1.78 \\
+3{,}500  & 0.0070 & 0.0145 & 0.48 \\
+4{,}000  & 0.0060 & 0.0188 & 0.32 \\
+5{,}000  & 0.0049 & 0.0090 & 0.54 \\
+6{,}000  & 0.0030 & 0.0118 & 0.25 \\
+7{,}000  & 0.0039 & 0.0103 & 0.38 \\
+7{,}500  & 0.0035 & 0.0107 & 0.32 \\
+\bottomrule
+\end{tabular}
+
+\vspace{5pt}
+{\small\raggedright \textit{Note.} $\overline{|d_s|}$ is the mean absolute CPU--GPU difference in
+validation accuracy across eight seeds; $\sigma_s$ is the between-seed standard deviation of the
+GPU runs at the same step. Rows for 4{,}500, 5{,}500 and 6{,}500 omitted for space; the full
+table is in the repository.\par}
+\end{table}
+
+Grouping into regimes, the mean absolute difference is $0.0331$ over steps 500--2{,}500 and
+$0.0060$ over steps 3{,}000--7{,}500, a decay of $5.5\times$. Expressed relative to between-seed
+dispersion at the same step, the backend term averages $1.30\times$ in the transient and
+$0.53\times$ in the late regime. Over all 120 comparisons the ratio is $0.81\times$.
+
+The interpretation is that the two trajectories are not diverging but converging. Different
+arithmetic on different devices separates the runs early, when the loss surface is being
+traversed quickly and small perturbations are amplified; as training settles, both runs approach
+the same region and the difference shrinks.
+
+\subsection{No directional bias}
+
+Of the 120 signed differences, 64 are negative. Averaging within seed and testing the eight
+per-seed means against zero gives $t(7) = -1.42$, $p = .198$. There is no evidence that CPU
+systematically underperforms or outperforms the GPU; what the backend contributes is dispersion,
+not a shift. This conclusion was stable across sample sizes ($n = 3, 4, 8$) and across both
+horizons, and it is the most robust finding of the experiment.
+
+\subsection{A control that came for free}
+
+One seed lacked a checkpoint and was retrained from zero on the same machine. It reproduced
+$0.5182$ at step 500 against $0.51822$ in the original CPU run. Within a backend, training is
+exactly reproducible; the differences measured here therefore arise from the change of device
+and not from run-to-run variability.
+
+\section{The error we made first, and why it is worth reporting}
+
+Our first analysis compared the backend differences, which were measured over steps 500--2{,}500,
+against a \emph{single} between-seed standard deviation of $0.01105$---the value at step 7{,}500.
+That produced a ratio of $3.00\times$ and a worst case of $20.25\times$, and supported the
+conclusion that backend choice dominates seed choice.
+
+It is wrong, because between-seed dispersion is not a property of the experiment but a function
+of the step:
+
+\begin{center}
+\small
+\begin{tabular}{rccccccc}
+\toprule
+Step & 500 & 1{,}000 & 1{,}500 & 2{,}000 & 2{,}500 & 5{,}000 & 7{,}500 \\
+\midrule
+$\sigma_s$ & .101 & .073 & .038 & .010 & .014 & .009 & .011 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A factor of nine between the transient and the late regime. Anchoring an early-regime numerator
+to a late-regime denominator inflates the ratio; pairing each step against its own $\sigma_s$
+brings $3.00\times$ down to $1.30\times$ over the same steps. The reported worst case was the
+same artifact: the largest single difference, $0.224$, occurs at step 1{,}500 of one seed, where
+$\sigma_s = 0.038$, not $0.011$.
+
+We report this because the failure mode is easy to reproduce, invisible in the output, and would
+have led us to publish the opposite of what the extended measurement shows. Any study that
+summarizes non-stationary noise with one number is exposed to it.
+
+\section{Limitations}
+
+The result is specific to one architecture, one task, one GPU model and one CPU. It does not
+separate ``CPU versus GPU'' from ``this CPU versus this GPU,'' and it says nothing about
+mixed-precision training, distributed reductions, or larger models, where the mechanism may
+differ in magnitude or in sign. The CPU runs were executed with the processor frequency capped
+at 75\% for thermal reasons; this changes wall-clock time per step, not arithmetic. Finally,
+$p = .198$ with eight seeds does not establish the absence of bias---it establishes that any
+bias is small relative to dispersion.
+
+\section{Implications}
+
+The headline is a measurement caveat, not a reproducibility alarm. In the regime where
+architecture comparisons are actually decided, changing backend contributed roughly half the
+variation of changing seed, and about 30\% of the decision margin of the study that hosted this
+experiment. Reporting ``mean $\pm$ SD over $N$ seeds'' is not meaningfully incomplete on that
+account.
+
+The transferable point is narrower and, we think, more useful: \emph{reproducibility studies must
+declare the training regime in which they measured}. A backend comparison conducted at 2{,}500
+steps and one conducted at 7{,}500 steps on the same system differ by a factor of five, and the
+early number is the alarming one. Absent that declaration, a reader cannot tell whether a
+reported irreproducibility is a property of the system or an artifact of when the ruler was
+applied.
+
+\section*{Open Practices}
+
+The training code, the stored validation histories for all sixteen runs, the analysis script that
+regenerates every number in this note, and the full step-by-step table are available at
+\texttt{github.com/SperanzaMax/telar-ligamento} under \texttt{resultados/backend/}. The
+non-stationarity of validation noise documented in Section~5 motivated a feature of the
+\texttt{stoppower} package (\url{https://doi.org/10.5281/zenodo.21711767}), which requires the
+user to declare the step range over which noise is estimated and warns when the constant-noise
+assumption fails within a window. The pre-registered study that supplied the runs is reported
+separately (\url{https://doi.org/10.5281/zenodo.21630279}).
+
+\end{document}
