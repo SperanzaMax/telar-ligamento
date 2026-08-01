@@ -158,6 +158,20 @@ check("pero informa la magnitud igual", "sin degradación material" in inf)
 check("PS-1 conserva su veredicto", "**VEREDICTO: CONFIRMA**" in inf)
 shutil.rmtree(d)
 
+print("\n=== B1-ter: con la extensión A MITAD de camino NO se pronuncia ===")
+# mix22 va por 5000 de un N_common de 10000, y ademas se degrado 0.03 (> umbral).
+# El criterio se declaro sobre la extension COMPLETA: no debe disparar todavia.
+d = tempfile.mkdtemp()
+escenario(d, rescate_primaria=0.10, rescate_secundaria=0.13)
+for s in range(8):                       # bajar mix22 de la primaria a 5000 (delta fija N_common=5000)
+    r = os.path.join(d, f"e1_mix22_seed{s}.json")
+    o = json.load(open(r)); o["steps"] = 3000; json.dump(o, open(r, "w"))
+inf = correr_aggregate(d)
+check("no dispara con la extensión incompleta", "DEGRADACIÓN MATERIAL" not in inf)
+check("y dice que está en curso", "extensión EN CURSO" in inf)
+check("PS-1 conserva su veredicto mientras tanto", "**VEREDICTO: CONFIRMA**" in inf)
+shutil.rmtree(d)
+
 print("\n=== B1-ter: sin extensión corrida, el veredicto se imprime como «no aplica» ===")
 d = tempfile.mkdtemp()
 escenario(d, rescate_primaria=0.10, rescate_secundaria=0.10)

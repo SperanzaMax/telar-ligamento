@@ -281,7 +281,7 @@ UMBRAL_B1TER = 0.0200        # = piso de R11; caída media que cuenta como degra
 CARGAS_B1TER = (96, 128)
 
 
-def veredicto_b1ter(c3_prim, c3_sec, umbral=UMBRAL_B1TER, cargas=CARGAS_B1TER):
+def veredicto_b1ter(c3_prim, c3_sec, umbral=UMBRAL_B1TER, cargas=CARGAS_B1TER, n_common=None):
     """B1-ter: ¿`mix22` se degradó al extenderla de su fase A hasta `N_common`?
 
     Se declaró ANTES de correr la extensión (enmienda congelada con hash): una caída media
@@ -298,6 +298,13 @@ def veredicto_b1ter(c3_prim, c3_sec, umbral=UMBRAL_B1TER, cargas=CARGAS_B1TER):
     if c3_prim[0]["steps"] == c3_sec[0]["steps"]:
         return {"veredicto": "no aplica",
                 "motivo": f"la extensión no corrió (ambas tablas a N={c3_prim[0]['steps']})",
+                "caidas": {}, "umbral": umbral}
+    # El criterio se declaró sobre la extensión COMPLETA (hasta N_common). Evaluarlo a mitad de
+    # camino daría un veredicto sobre un punto que la enmienda no declaró.
+    if n_common is not None and c3_prim[0]["steps"] < n_common:
+        return {"veredicto": "no aplica",
+                "motivo": f"extensión EN CURSO (N={c3_prim[0]['steps']} < N_common={n_common}); "
+                          f"el criterio se declaró sobre la extensión completa",
                 "caidas": {}, "umbral": umbral}
 
     caidas = {}

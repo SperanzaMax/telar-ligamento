@@ -140,7 +140,7 @@ def aggregate():
         ps1 = an.veredicto_ps1({"c3": _acc1(prim["mix22"], evalL), "c2": _acc1(c2p, evalL)},
                                {"c3": _acc1(sec["mix22"], evalL), "c2": _acc1(c2s, evalL)}, margen)
         # B1-ter: fusible más sensible que B3 — puede anular PS-1 aunque las dos tablas concuerden
-        b1ter = an.veredicto_b1ter(prim["mix22"], sec["mix22"])
+        b1ter = an.veredicto_b1ter(prim["mix22"], sec["mix22"], n_common=N_common)
         v_ps1 = ("no concluyente por sensibilidad al presupuesto"
                  if b1ter["veredicto"] == "DEGRADACIÓN MATERIAL" else ps1["veredicto"])
         L += ["## PS-1 — rescate de capacidad (C3 vs C2)", "",
