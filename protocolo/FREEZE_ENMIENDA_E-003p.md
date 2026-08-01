@@ -14,6 +14,22 @@ sha256sum ENMIENDA_E-003p_20260801.md
 python3 experimentos/verificar_anclas.py --requiere E-003p
 ```
 
+## Ancla pública — timestamps server-side de GitHub (inatacables)
+
+| evento | timestamp (UTC) |
+|---|---|
+| push a `main` | **2026-08-01T21:48:01Z** |
+| release publicada | **2026-08-01T21:48:36Z** |
+
+- Commit: `83a02a8` · Tag firmado: `ligamento-enmienda-e003p` (objeto anotado `9482b415…`,
+  ED25519, *Good signature*)
+- Release: https://github.com/SperanzaMax/telar-ligamento/releases/tag/ligamento-enmienda-e003p
+
+**Estos timestamps los pone el servidor de GitHub, no el autor.** Preceden a la primera unidad de GPU
+de la extensión de `mix22`, que al momento de este congelamiento no había corrido. Es lo que hace
+oponible a terceros la declaración previa de B1-ter: sin ellos, el criterio sería una fecha escrita
+por quien ya podría haber visto el resultado.
+
 ---
 
 ## Qué congela
