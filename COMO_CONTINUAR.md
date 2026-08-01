@@ -65,32 +65,42 @@ unidad y al cerrar la sesión.
 ## Configuración actual (celda 8)
 
 ```
-CONDS=delta,softmax,mix22      # dan TODOS los veredictos pre-registrados
+FASE = 'B'                     # la perilla: extiende mix22 hasta N_common
+CONDS=delta,softmax,mix22      # las tres siguen declaradas; la fase B sólo toca mix22
 N_SEEDS=8
 PRESUPUESTO_MIN=210            # 3.5 h, con margen antes del corte de Colab
 MODO=sesion
 ```
 
-`mix31,mix13` (C4) son **exploratorias**: no entran en ningún veredicto del prereg. Se corren en una segunda
-tanda, agregándolas a `CONDS` cuando las tres principales estén listas.
+`mix31,mix13` (C4) son **exploratorias**: no entran en ningún veredicto del prereg y corren en **run
+separado que no comparte `N_common`**. `mix13` es la única que puede caer del techo —`softmax` y
+`mix22` están las dos en 1,000— así que es la única que puede dar dosis-respuesta. ~5,1 h, después
+de esta tanda.
 
 ## Cuánto falta
 
-Con las 3 condiciones en T4: **~47 h de cómputo ≈ 14 sesiones** de 3.5 h. A dos sesiones por día, ~1 semana.
+**15,66 h ≈ 5 sesiones** de 3,5 h (la fase B de `mix22`). A dos sesiones por día, unos 3 días.
 
-## Carta guardada (no aplicada)
+*(El «~47 h ≈ 14 sesiones» de la versión anterior era la campaña entera desde el 23 de julio; la fase
+A ya se pagó.)*
 
-**Bucketing del padding**: el loop de entrenamiento paddea siempre a 514 tokens aunque la secuencia real
-promedia ~230 → ~2.5× de ganancia (47 h → ~19 h). Es matemáticamente equivalente (padding a la derecha,
-atención causal, el scan de delta emite las salidas reales antes de tocar el relleno), pero **exige reiniciar
-la campaña desde cero** para no mezclar implementaciones entre condiciones, y sería un cambio post-freeze a
-documentar en `desviaciones.md`. Cuanto más avance la campaña, más caro es cambiar de opinión.
+## Carta descartada: bucketing del padding
+
+**Medido y NO sirve para E1.** El loop paddea a 514 tokens con secuencia real ~230, y el bucketing
+baja el cómputo 1,83× — pero **diverge**: 0 de 69 tensores idénticos, diferencia 1,9·10⁻³ en 40 pasos.
+Obligaría a reentrenar las 24 semillas desde cero, así que el ahorro neto real es 21-29 %, no el 61 %
+que se estimó al principio. Queda para **E2-E4, que arrancan de cero**. Implementado y apagado por
+defecto (`_bucket_T` en `entrenar.py`, `n_buckets=None`).
 
 ## Cuando termine
 
-La celda 8b dirá **«CAMPAÑA COMPLETA»** y el informe se emite solo: `E1_informe.md` en Drive, con PS-1 (doble
-tabla + regla de discordancia del Anexo B), PS-2, PS-4 (i/ii/iii), PS-5 (con control por paso de parada) y
-P1.1/P1.2/P1.3 del protocolo madre. Ese informe es la entrada del análisis final, que se revisa a mano.
+La celda 8b dirá **«CAMPAÑA COMPLETA»** y el informe se emite solo: `E1_informe.md` en Drive, con PS-1
+(doble tabla + regla de discordancia B3 + **el veredicto de B1-ter**), PS-2, PS-4 (i/ii/iii), PS-5
+(con control por paso de parada) y P1.1/P1.2/P1.3 del protocolo madre.
+
+Ese informe es la entrada del análisis final. **Lo que no hay que hacer es retocarlo a mano:** los
+veredictos que puede mover un humano —B3 y B1-ter— están automatizados a propósito, porque después
+del 1 de agosto no queda una capa de revisión independiente en el proyecto.
 
 ---
 
