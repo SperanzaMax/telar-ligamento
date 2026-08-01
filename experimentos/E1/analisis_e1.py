@@ -244,3 +244,82 @@ def veredicto_ps5(capacidad, t2, paso_conv):
     return {"veredicto": v, "pearson_crudo": crudo, "ic_crudo": (lo, hi), "pearson_parcial": parcial,
             "retencion_parcial": retencion, "spearman_crudo": spearman(cap, t2),
             "diagnostico_paso_parada": diag}
+
+
+# ------------------------------------------------- rótulos honestos del informe (E-003′/B1-bis)
+
+def titulo_tabla_primaria(prim, conds, n_common):
+    """Encabezado de la tabla primaria, sin afirmar que todas las condiciones están a N_common.
+
+    Con la excepción por saturación (B1-bis) una condición puede quedar legítimamente a su N real;
+    el encabezado tiene que decirlo, porque la columna `N` de la tabla ya lo dice.
+    """
+    sin_extender = [c for c in conds if prim.get(c) and prim[c][0]["steps"] < n_common]
+    t = f"Tabla PRIMARIA — N_common = {n_common} (da el veredicto)"
+    return t + (f" · † NO extendidas, a su N real: {', '.join(sin_extender)}" if sin_extender
+                else " · todas las condiciones a N_common")
+
+
+def linea_concordancia_ps1(prim, sec, c2p, c2s, ps1):
+    """Línea de concordancia de PS-1, sin afirmar que B3 corrió cuando no corrió.
+
+    `cerrar_faseA` congela la tabla secundaria copiando la primaria. Hasta que la fase B extienda
+    las condiciones, las dos tablas contienen el MISMO checkpoint y su coincidencia es tautológica:
+    reportarla como «concordantes» la haría pasar por un chequeo de robustez que no se hizo.
+    """
+    if (prim["mix22"][0]["steps"] == sec["mix22"][0]["steps"]
+            and c2p[0]["steps"] == c2s[0]["steps"]):
+        return ("- tablas **no comparables**: primaria y secundaria contienen el mismo checkpoint "
+                "en C3 y C2 (la fase B no corrió) → **B3 no se ejecutó**, la coincidencia no es "
+                "chequeo de robustez")
+    return f"- tablas {'CONCORDANTES' if ps1['concordantes'] else 'DISCORDANTES'}"
+
+
+# ------------------------------------------------- B1-ter (enmienda E-003′, 2026-08-01)
+
+UMBRAL_B1TER = 0.0200        # = piso de R11; caída media que cuenta como degradación material
+CARGAS_B1TER = (96, 128)
+
+
+def veredicto_b1ter(c3_prim, c3_sec, umbral=UMBRAL_B1TER, cargas=CARGAS_B1TER):
+    """B1-ter: ¿`mix22` se degradó al extenderla de su fase A hasta `N_common`?
+
+    Se declaró ANTES de correr la extensión (enmienda congelada con hash): una caída media
+    apareada ≥ `umbral` en capacity@1 de cualquiera de `cargas`, entre el checkpoint de cierre de
+    fase A (tabla secundaria) y el de `N_common` (tabla primaria), obliga a reportar PS-1 como
+    «no concluyente por sensibilidad al presupuesto». No se relee ni se discute: se ejecuta.
+
+    `c3_prim` / `c3_sec` son listas de runs (dicts de JSON) de la MISMA condición.
+    Devuelve dict con `veredicto` ∈ {no aplica, sin degradación material, DEGRADACIÓN MATERIAL}.
+    """
+    if not c3_prim or not c3_sec:
+        return {"veredicto": "no aplica", "motivo": "faltan datos de una de las dos tablas",
+                "caidas": {}, "umbral": umbral}
+    if c3_prim[0]["steps"] == c3_sec[0]["steps"]:
+        return {"veredicto": "no aplica",
+                "motivo": f"la extensión no corrió (ambas tablas a N={c3_prim[0]['steps']})",
+                "caidas": {}, "umbral": umbral}
+
+    caidas = {}
+    for L in cargas:
+        antes = np.array([r["capacity"][str(L)]["1"] for r in c3_sec], float)
+        despues = np.array([r["capacity"][str(L)]["1"] for r in c3_prim], float)
+        caidas[L] = float((antes - despues).mean())      # positivo = se degradó al extender
+    peor = max(caidas.values())
+    v = "DEGRADACIÓN MATERIAL" if peor >= umbral else "sin degradación material"
+    return {"veredicto": v, "caidas": caidas, "peor": peor, "umbral": umbral,
+            "N_antes": c3_sec[0]["steps"], "N_despues": c3_prim[0]["steps"]}
+
+
+def lineas_b1ter(res):
+    """Bloque de informe para B1-ter. El veredicto se imprime siempre, aunque no aplique."""
+    L = ["## B1-ter — degradación de C3 al extender (enmienda E-003′, congelada antes de correr)", ""]
+    if res["veredicto"] == "no aplica":
+        return L + [f"- **NO APLICA**: {res['motivo']}.", ""]
+    det = " · ".join(f"L{k}: {v:+.4f}" for k, v in sorted(res["caidas"].items()))
+    L += [f"- **{res['veredicto']}** (umbral {res['umbral']:.4f}, "
+          f"N {res['N_antes']} → {res['N_despues']})",
+          f"- caída media apareada por carga: {det} · peor {res['peor']:+.4f}"]
+    if res["veredicto"] == "DEGRADACIÓN MATERIAL":
+        L += ["- ⚠️ **PS-1 pasa a «no concluyente por sensibilidad al presupuesto»** por B1-ter."]
+    return L + [""]

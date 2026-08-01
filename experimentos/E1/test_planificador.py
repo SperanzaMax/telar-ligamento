@@ -167,6 +167,36 @@ check("y la fase A sí tiene trabajo pendiente", any(a[0] == "entrenar" for a in
 shutil.rmtree(d)
 shutil.rmtree(d2)
 
+print("\n=== E-003′/B1-bis: la excepción por saturación es POR CONDICIÓN, no por fase ===")
+d3 = tempfile.mkdtemp()
+poblar(d3, "delta", 10000, converged=True, propio=True)     # la lenta fija N_common
+poblar(d3, "softmax", 2500, converged=True, propio=True)    # saturada, exceptuada
+poblar(d3, "mix22", 2500, converged=True, propio=True)      # saturada, pero decide PS-1
+est3 = pl.leer_estado(d3, CONDS, 8)
+
+libre = [a for a in pl.plan(est3, CONDS, 8) if a[0] == "entrenar"]
+check("sin restricción se extienden softmax Y mix22 (B1 sin enmendar)",
+      {a[1] for a in libre} == {"softmax", "mix22"}, sorted({a[1] for a in libre}))
+
+restr = [a for a in pl.plan(est3, CONDS, 8, faseB_conds=["mix22"]) if a[0] == "entrenar"]
+check("con FASE_B_CONDS=mix22 sólo se extiende mix22",
+      {a[1] for a in restr} == {"mix22"}, sorted({a[1] for a in restr}))
+check("mix22 se extiende igual hasta N_common=10000 (la excepción no mueve el punto)",
+      max(a[3] for a in restr) == 10000)
+check("y ahorra exactamente las unidades de softmax", len(libre) - len(restr) == 8 * 3,
+      f"{len(libre)} - {len(restr)}")
+check("el informe se sigue encolando al final",
+      pl.plan(est3, CONDS, 8, faseB_conds=["mix22"])[-1][0] == "informe")
+
+# sacar FASE_MAX sin fijar FASE_B_CONDS es el accidente que ya pasó una vez: debe avisarlo
+txt3 = pl.resumen(est3, CONDS, 8, {}, 210 * 60, fase_max="A")
+check("el aviso del freno advierte que sacar FASE_MAX solo no alcanza",
+      "FASE_B_CONDS" in txt3)
+txt4 = pl.resumen(est3, CONDS, 8, {}, 210 * 60, faseB_conds=["mix22"])
+check("el resumen declara la restricción y qué quedó exceptuado",
+      "FASE B RESTRINGIDA" in txt4 and "softmax" in txt4.split("EXCEPTUADAS")[1])
+shutil.rmtree(d3)
+
 print("\n" + "=" * 60)
 if fallos:
     print(f"✗ {len(fallos)} FALLO(S): " + "; ".join(fallos))

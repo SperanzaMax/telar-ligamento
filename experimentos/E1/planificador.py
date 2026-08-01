@@ -58,7 +58,7 @@ def _convergio(est_cond, seed):
 
 # ------------------------------------------------------------------ plan
 
-def plan(estado, conds, n_seeds, fase_max=None):
+def plan(estado, conds, n_seeds, fase_max=None, faseB_conds=None):
     """Lista ORDENADA de acciones pendientes hasta terminar la campaña.
 
     Acciones: ("entrenar", cond, seed, target_steps) | ("cerrar_faseA", cond, N_final) |
@@ -69,6 +69,11 @@ def plan(estado, conds, n_seeds, fase_max=None):
     ~30 h de T4 y consiste enteramente en sobre-entrenar condiciones saturadas. Es lo que manda el
     prereg congelado, pero la enmienda E-003 propone justamente no hacerlo y está sin resolver: el
     freno existe para que esas 30 h no se gasten por inercia de re-ejecutar la celda de sesión.
+
+    `faseB_conds` restringe QUÉ condiciones se extienden en la fase B (E-003′/B1-bis: la excepción
+    por saturación es por condición, no por fase). `None` = todas, el comportamiento del prereg sin
+    enmendar. `N_common` se sigue calculando sobre TODAS las condiciones: la excepción cambia quién
+    se extiende hasta ese punto, nunca dónde está el punto.
     """
     acciones = []
 
@@ -109,7 +114,8 @@ def plan(estado, conds, n_seeds, fase_max=None):
     if faltantes:                      # estado inconsistente: conservador, no se asume convergencia
         n_por_cond.update({c: BLOCKS[-1] for c in faltantes})
     n_common = max(n_por_cond.values())
-    for c in conds:
+    extender = conds if faseB_conds is None else [c for c in conds if c in faseB_conds]
+    for c in extender:
         for s in range(n_seeds):
             hechos = _pasos(estado[c], s)
             while hechos < n_common:                 # fraccionado en bloques de 2500: unidades atómicas
@@ -169,9 +175,9 @@ def fmt(seg):
     return f"{h}h{m // 60:02d}m" if h else f"{m // 60}m{m % 60:02d}s"
 
 
-def resumen(estado, conds, n_seeds, costos, presupuesto_seg, fase_max=None):
+def resumen(estado, conds, n_seeds, costos, presupuesto_seg, fase_max=None, faseB_conds=None):
     """Texto de avance: qué está hecho, qué falta y cuántas sesiones más."""
-    acciones = plan(estado, conds, n_seeds, fase_max=fase_max)
+    acciones = plan(estado, conds, n_seeds, fase_max=fase_max, faseB_conds=faseB_conds)
     pend = [a for a in acciones if a[0] == "entrenar"]
     total_seg = sum(estimar_seg(a, costos) for a in pend)
     L = ["=== Avance de la campaña E1 ==="]
@@ -193,5 +199,12 @@ def resumen(estado, conds, n_seeds, costos, presupuesto_seg, fase_max=None):
         L += ["", "  ⏸  FASE A COMPLETA · FRENO ACTIVO (FASE_MAX=A).",
               "     La fase B (B1: extender TODAS las condiciones hasta N_common, incluidas las",
               "     saturadas) NO se encoló. Cuesta ~30 h de T4 y es justo lo que la enmienda",
-              "     E-003 propone no hacer. Sacá FASE_MAX para largarla, con la decisión tomada."]
+              "     E-003 propone no hacer. Sacá FASE_MAX para largarla, con la decisión tomada.",
+              "     Si la decisión es la excepción por saturación (E-003′/B1-bis), NO alcanza con",
+              "     sacar FASE_MAX: hay que fijar además FASE_B_CONDS con las condiciones que sí",
+              "     se extienden, o la fase B arranca entera igual."]
+    if faseB_conds is not None:
+        exceptuadas = [c for c in conds if c not in faseB_conds]
+        L += ["", f"  ⚠  FASE B RESTRINGIDA (E-003′/B1-bis): se extiende {sorted(faseB_conds)}"
+                  + (f" · EXCEPTUADAS {exceptuadas}" if exceptuadas else "")]
     return "\n".join(L)

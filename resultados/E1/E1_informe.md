@@ -1,10 +1,14 @@
-# E1 — informe (prereg de seguimiento v1.1)
+# E1 — informe (prereg de seguimiento v1.1) — REGENERADO LOCAL (parcial)
 
-**N_common = 10000** · **carga de evaluación (desde C2 convergida): L96** · **margen efectivo R11 = 0.0200**
+> Regenerado sin JAX desde `resultados/E1/*.json`. Semillas presentes por condición: {'delta': 8, 'softmax': 8, 'mix22': 8}. Las condiciones con <8 semillas están INCOMPLETAS.
 
-N_final por condición (convergencia colectiva propia): delta=10000, softmax=—, mix22=2500
+> N homogéneo dentro de cada condición.
 
-### Tabla PRIMARIA — todas las condiciones a N_common = 10000 (da el veredicto)
+**N_common = 10000** · **carga de evaluación (desde C2): L96** · **margen efectivo R11 = 0.0200**
+
+N_final por condición (convergencia colectiva propia): delta=10000, softmax=2500, mix22=2500
+
+### Tabla PRIMARIA — N_common = 10000 (da el veredicto) · † NO extendidas, a su N real: softmax, mix22
 
 | cond | L8 | L16 | L32 | L64 | L96 | L128 | T2@32 | N |
 |---|---|---|---|---|---|---|---|---|
@@ -17,6 +21,7 @@ N_final por condición (convergencia colectiva propia): delta=10000, softmax=—
 | cond | L8 | L16 | L32 | L64 | L96 | L128 | T2@32 | N |
 |---|---|---|---|---|---|---|---|---|
 | delta | 1.000 | 1.000 | 1.000 | 0.985 | 0.921 | 0.820 | 0.972 | 10000 |
+| softmax | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 2500 |
 | mix22 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 0.999 | 2500 |
 
 ## PS-1 — rescate de capacidad (C3 vs C2)
@@ -24,7 +29,11 @@ N_final por condición (convergencia colectiva propia): delta=10000, softmax=—
 - **VEREDICTO: CONFIRMA**
 - primaria (N_common): confirma · dif = +0.0792 · IC95 [+0.0747, +0.0838]
 - secundaria (convergencia propia): confirma · dif = +0.0792 · IC95 [+0.0747, +0.0838]
-- tablas CONCORDANTES
+- tablas **no comparables**: primaria y secundaria contienen el mismo checkpoint en C3 y C2 (la fase B no corrió) → **B3 no se ejecutó**, la coincidencia no es chequeo de robustez
+
+## B1-ter — degradación de C3 al extender (enmienda E-003′, congelada antes de correr)
+
+- **NO APLICA**: la extensión no corrió (ambas tablas a N=2500).
 
 ## PS-2 — posición de C3 entre piso y techo (descriptiva)
 
@@ -51,4 +60,4 @@ N_final por condición (convergencia colectiva propia): delta=10000, softmax=—
 - **P1.3** (no interferencia): T2(C3) = 0.999 vs min(C1,C2) = 0.972 (sin interferencia ✓).
 
 ---
-*Veredictos automáticos según el prereg de seguimiento v1.1 (SHA en `FREEZE_PREREG_SEGUIMIENTO_v1.1.md`). El informe final los revisa a mano.*
+*Veredictos automáticos según el prereg de seguimiento v1.1. Informe PARCIAL regenerado localmente sin JAX; el definitivo lo emite la celda 9 del notebook con la campaña completa.*

@@ -120,6 +120,55 @@ inf = correr_aggregate(d)
 check("PS-1 falsa cuando no hay rescate", "**VEREDICTO: FALSA**" in inf)
 shutil.rmtree(d)
 
+print("\n=== escenario FASE B SIN CORRER (E-003′/B1-bis: mismo checkpoint en ambas tablas) ===")
+d = tempfile.mkdtemp()
+escenario(d, rescate_primaria=0.10, rescate_secundaria=0.10)
+# La fase B no corrió: `cerrar_faseA` copió la primaria, así que mix22 queda a 2500 en las DOS.
+for s in range(8):
+    shutil.copyfile(os.path.join(d, f"e1_mix22_seed{s}_propio.json"),
+                    os.path.join(d, f"e1_mix22_seed{s}.json"))
+inf = correr_aggregate(d)
+check("no afirma que las tablas concuerdan cuando son el mismo checkpoint",
+      "CONCORDANTES" not in inf)
+check("declara que B3 no se ejecutó", "B3 no se ejecutó" in inf)
+check("el encabezado marca la condición no extendida en vez de decir «todas a N_common»",
+      "NO extendidas, a su N real: mix22" in inf and "todas las condiciones a N_common" not in inf)
+shutil.rmtree(d)
+
+print("\n=== B1-ter: el fusible anula PS-1 aunque las dos tablas concuerden ===")
+# mix22 se degrada 0.03 (> umbral 0.02) al extender, pero sigue muy por encima de delta:
+# las dos tablas confirman igual, así que B3 NO dispara — B1-ter sí tiene que dispararlo.
+d = tempfile.mkdtemp()
+escenario(d, rescate_primaria=0.10, rescate_secundaria=0.13)
+inf = correr_aggregate(d)
+check("B3 por sí sola no habría disparado (ambas tablas confirman)",
+      "primaria (N_common): confirma" in inf and "secundaria (convergencia propia): confirma" in inf)
+check("B1-ter detecta la degradación material", "DEGRADACIÓN MATERIAL" in inf)
+check("y el veredicto de PS-1 queda anulado",
+      "**VEREDICTO: NO CONCLUYENTE POR SENSIBILIDAD AL PRESUPUESTO**" in inf)
+check("declara que lo impuso B1-ter", "impuesto por B1-ter" in inf)
+shutil.rmtree(d)
+
+print("\n=== B1-ter: una caída MENOR al umbral se reporta pero no cambia el veredicto ===")
+d = tempfile.mkdtemp()
+escenario(d, rescate_primaria=0.10, rescate_secundaria=0.11)   # cae 0.01 < umbral 0.02
+inf = correr_aggregate(d)
+check("no dispara con caída sub-umbral", "DEGRADACIÓN MATERIAL" not in inf)
+check("pero informa la magnitud igual", "sin degradación material" in inf)
+check("PS-1 conserva su veredicto", "**VEREDICTO: CONFIRMA**" in inf)
+shutil.rmtree(d)
+
+print("\n=== B1-ter: sin extensión corrida, el veredicto se imprime como «no aplica» ===")
+d = tempfile.mkdtemp()
+escenario(d, rescate_primaria=0.10, rescate_secundaria=0.10)
+for s in range(8):
+    shutil.copyfile(os.path.join(d, f"e1_mix22_seed{s}_propio.json"),
+                    os.path.join(d, f"e1_mix22_seed{s}.json"))
+inf = correr_aggregate(d)
+check("imprime B1-ter aunque no aplique (no se silencia)", "B1-ter" in inf and "NO APLICA" in inf)
+check("y dice por qué", "la extensión no corrió" in inf)
+shutil.rmtree(d)
+
 print("\n" + "=" * 60)
 if fallos:
     print(f"✗ {len(fallos)} FALLO(S): " + "; ".join(fallos))

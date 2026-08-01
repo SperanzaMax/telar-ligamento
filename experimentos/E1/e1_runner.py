@@ -132,21 +132,27 @@ def aggregate():
          f"**margen efectivo R11 = {margen:.4f}**", "",
          "N_final por condición (convergencia colectiva propia): " +
          ", ".join(f"{c}={ (sec[c][0]['steps'] if sec.get(c) else '—') }" for c in CONDS), ""]
-    L += tabla_md(prim, f"Tabla PRIMARIA — todas las condiciones a N_common = {N_common} (da el veredicto)")
+    L += tabla_md(prim, an.titulo_tabla_primaria(prim, CONDS, N_common))
     L += tabla_md(sec, "Tabla SECUNDARIA — cada condición en su propia convergencia (robustez)")
 
     # ---- PS-1 con la regla de discordancia (Anexo B3)
     if prim.get("mix22") and sec.get("mix22") and c2s:
         ps1 = an.veredicto_ps1({"c3": _acc1(prim["mix22"], evalL), "c2": _acc1(c2p, evalL)},
                                {"c3": _acc1(sec["mix22"], evalL), "c2": _acc1(c2s, evalL)}, margen)
+        # B1-ter: fusible más sensible que B3 — puede anular PS-1 aunque las dos tablas concuerden
+        b1ter = an.veredicto_b1ter(prim["mix22"], sec["mix22"])
+        v_ps1 = ("no concluyente por sensibilidad al presupuesto"
+                 if b1ter["veredicto"] == "DEGRADACIÓN MATERIAL" else ps1["veredicto"])
         L += ["## PS-1 — rescate de capacidad (C3 vs C2)", "",
-              f"- **VEREDICTO: {ps1['veredicto'].upper()}**",
+              f"- **VEREDICTO: {v_ps1.upper()}**"
+              + ("  ← impuesto por B1-ter" if v_ps1 != ps1["veredicto"] else ""),
               f"- primaria (N_common): {ps1['primaria']['veredicto']} · dif = {ps1['primaria']['dif']:+.4f} "
               f"· IC95 [{ps1['primaria']['ic'][0]:+.4f}, {ps1['primaria']['ic'][1]:+.4f}]",
               f"- secundaria (convergencia propia): {ps1['secundaria']['veredicto']} · "
               f"dif = {ps1['secundaria']['dif']:+.4f} "
               f"· IC95 [{ps1['secundaria']['ic'][0]:+.4f}, {ps1['secundaria']['ic'][1]:+.4f}]",
-              f"- tablas {'CONCORDANTES' if ps1['concordantes'] else 'DISCORDANTES'}", ""]
+              an.linea_concordancia_ps1(prim, sec, c2p, c2s, ps1), ""]
+        L += an.lineas_b1ter(b1ter)
         # PS-2 (descriptiva)
         c1m = _acc1(prim["softmax"], evalL).mean() if prim.get("softmax") else 1.0
         c2m, c3m = _acc1(c2p, evalL).mean(), _acc1(prim["mix22"], evalL).mean()
@@ -204,21 +210,26 @@ def main():
     MODO=sesion (defecto) | estado (solo informa) | informe (fuerza el agregado)
     PRESUPUESTO_MIN=210   (3.5 h; Colab free corta a las ~4 h)
     FASE_MAX=A            (opcional) frena al cerrar la fase A, sin encolar la fase B
+    FASE_B_CONDS=mix22    (opcional) restringe qué condiciones se extienden en la fase B
+                          (E-003′/B1-bis: excepción por saturación, es POR CONDICIÓN)
     """
     modo = os.environ.get("MODO", "sesion")
     presupuesto = float(os.environ.get("PRESUPUESTO_MIN", 210)) * 60
     fase_max = os.environ.get("FASE_MAX") or None
+    fb = os.environ.get("FASE_B_CONDS")
+    faseB_conds = [c.strip() for c in fb.split(",") if c.strip()] if fb else None
 
     estado = pl.leer_estado(RESULTS, CONDS, N_SEEDS)
     costos = pl.costos_medidos(RESULTS, CONDS)
-    print(pl.resumen(estado, CONDS, N_SEEDS, costos, presupuesto, fase_max=fase_max), flush=True)
+    print(pl.resumen(estado, CONDS, N_SEEDS, costos, presupuesto, fase_max=fase_max,
+                       faseB_conds=faseB_conds), flush=True)
     if modo == "estado":
         return
     if modo == "informe":
         aggregate()
         return
 
-    acciones = pl.plan(estado, CONDS, N_SEEDS, fase_max=fase_max)
+    acciones = pl.plan(estado, CONDS, N_SEEDS, fase_max=fase_max, faseB_conds=faseB_conds)
     hacer, restan, seg_est = pl.sesion(acciones, presupuesto, costos)
     n_train = sum(1 for a in hacer if a[0] == "entrenar")
     print(f"\n=== SESIÓN · {n_train} unidades · ≈{pl.fmt(seg_est)} estimados · "
@@ -245,7 +256,8 @@ def main():
 
     estado = pl.leer_estado(RESULTS, CONDS, N_SEEDS)
     costos = pl.costos_medidos(RESULTS, CONDS)
-    print("\n" + pl.resumen(estado, CONDS, N_SEEDS, costos, presupuesto, fase_max=fase_max), flush=True)
+    print("\n" + pl.resumen(estado, CONDS, N_SEEDS, costos, presupuesto, fase_max=fase_max,
+                       faseB_conds=faseB_conds), flush=True)
     if fase_max == "A" and all(estado[c]["faseA_cerrada"] for c in CONDS):
         notify("⏸️ E1 FASE A COMPLETA. La fase B (~30 h, sobre-entrenar las saturadas hasta "
                "N_common) NO arrancó: requiere decidir E-003 primero.")
