@@ -109,7 +109,7 @@ def tabla_md(data, titulo):
         if not r:
             continue
         fila = " | ".join(f"{_acc1(r, Lc).mean():.3f}" for Lc in LOADS)
-        L.append(f"| {c} | {fila} | {_t2(r, 32).mean():.3f} | {r[0]['steps']} |")
+        L.append(f"| {c} | {fila} | {_t2(r, 32).mean():.3f} | {an.celda_n(r)} |")
     return L + [""]
 
 
@@ -125,13 +125,14 @@ def aggregate():
     # (Anexo A/c) carga de evaluación desde la C2 CONVERGIDA — tabla primaria
     evalL = next((L for L in LOADS if _acc1(c2p, L).mean() < 0.95), 128)
     margen = an.margen_efectivo(_acc1(c2p, evalL).std(ddof=1))
-    N_common = max(r[0]["steps"] for r in prim.values() if r)
+    N_common = max(max(an.pasos(r)) for r in prim.values() if r)
 
-    L = ["# E1 — informe (prereg de seguimiento v1.1)", "",
-         f"**N_common = {N_common}** · **carga de evaluación (desde C2 convergida): L{evalL}** · "
-         f"**margen efectivo R11 = {margen:.4f}**", "",
-         "N_final por condición (convergencia colectiva propia): " +
-         ", ".join(f"{c}={ (sec[c][0]['steps'] if sec.get(c) else '—') }" for c in CONDS), ""]
+    L = ["# E1 — informe (prereg de seguimiento v1.1)", ""]
+    L += an.aviso_n_heterogeneo(prim, CONDS)
+    L += [f"**N_common = {N_common}** · **carga de evaluación (desde C2 convergida): L{evalL}** · "
+          f"**margen efectivo R11 = {margen:.4f}**", "",
+          "N_final por condición (convergencia colectiva propia): " +
+          ", ".join(f"{c}={ (an.celda_n(sec[c]) if sec.get(c) else '—') }" for c in CONDS), ""]
     L += tabla_md(prim, an.titulo_tabla_primaria(prim, CONDS, N_common))
     L += tabla_md(sec, "Tabla SECUNDARIA — cada condición en su propia convergencia (robustez)")
 

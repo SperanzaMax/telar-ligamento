@@ -172,6 +172,32 @@ check("y dice que está en curso", "extensión EN CURSO" in inf)
 check("PS-1 conserva su veredicto mientras tanto", "**VEREDICTO: CONFIRMA**" in inf)
 shutil.rmtree(d)
 
+print("\n=== B1-ter: extensión HETEROGÉNEA (unas semillas a N_common, otras no) NO se pronuncia ===")
+# El caso real de la fase B: extiende UNA semilla por vez, así que hay un estado intermedio con
+# seed0 ya en N_common y el resto sin tocar. Mirar `runs[0]["steps"]` daba por extendida a toda la
+# condición, y la media apareada se diluía con las semillas quietas (caída 0 por construcción).
+d = tempfile.mkdtemp()
+escenario(d, rescate_primaria=0.10, rescate_secundaria=0.13)   # las extendidas caen 0.03 > umbral
+for s in range(3, 8):                    # sólo 0,1,2 llegaron a N_common; 3..7 siguen en fase A
+    r = os.path.join(d, f"e1_mix22_seed{s}.json")
+    o = json.load(open(r)); o["steps"] = 2500; json.dump(o, open(r, "w"))
+    shutil.copyfile(os.path.join(d, f"e1_mix22_seed{s}_propio.json"), r)
+inf = correr_aggregate(d)
+check("no dispara B1-ter con la extensión a medias", "DEGRADACIÓN MATERIAL" not in inf)
+# Y tampoco absuelve: las 3 extendidas caen 0.03 (> umbral 0.02), pero promediadas con las 5
+# quietas dan 3·0.03/8 = 0.011 < 0.02. Un veredicto acá ENMASCARA una degradación material real.
+check("tampoco declara «sin degradación material» (la media diluida la enmascararía)",
+      "sin degradación material" not in inf)
+check("dice cuántas semillas van", "3/8 semillas a N_common" in inf)
+check("la columna N muestra el rango, no el de la semilla 0", "2500–5000 ⚠" in inf)
+check("avisa de N heterogéneo", "N HETEROGÉNEO dentro de una condición" in inf)
+check("no declara las tablas CONCORDANTES", "CONCORDANTES" not in inf)
+check("dice que B3 aún no es un chequeo completo",
+      "5/8 semillas de C3 siguen con el mismo checkpoint" in inf)
+check("el encabezado no da mix22 por extendida", "NO extendidas, a su N real" in inf
+      and "mix22" in [l for l in inf.split("\n") if "NO extendidas" in l][0])
+shutil.rmtree(d)
+
 print("\n=== B1-ter: sin extensión corrida, el veredicto se imprime como «no aplica» ===")
 d = tempfile.mkdtemp()
 escenario(d, rescate_primaria=0.10, rescate_secundaria=0.10)

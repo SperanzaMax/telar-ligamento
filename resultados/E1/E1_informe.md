@@ -2,7 +2,7 @@
 
 > Regenerado sin JAX desde `resultados/E1/*.json`. Semillas presentes por condición: {'delta': 8, 'softmax': 8, 'mix22': 8}. Las condiciones con <8 semillas están INCOMPLETAS.
 
-> N homogéneo dentro de cada condición.
+> ⚠️ **N HETEROGÉNEO dentro de una condición** (viola N_common; PS-1/PS-5 NO válidos hasta nivelar): {'mix22': [2500, 7500, 10000]}
 
 **N_common = 10000** · **carga de evaluación (desde C2): L96** · **margen efectivo R11 = 0.0200**
 
@@ -14,7 +14,7 @@ N_final por condición (convergencia colectiva propia): delta=10000, softmax=250
 |---|---|---|---|---|---|---|---|---|
 | delta | 1.000 | 1.000 | 1.000 | 0.985 | 0.921 | 0.820 | 0.972 | 10000 |
 | softmax | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 2500 |
-| mix22 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 0.999 | 2500 |
+| mix22 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 0.999 | 2500–10000 ⚠ |
 
 ### Tabla SECUNDARIA — cada condición en su propia convergencia (robustez)
 
@@ -29,11 +29,11 @@ N_final por condición (convergencia colectiva propia): delta=10000, softmax=250
 - **VEREDICTO: CONFIRMA**
 - primaria (N_common): confirma · dif = +0.0792 · IC95 [+0.0747, +0.0838]
 - secundaria (convergencia propia): confirma · dif = +0.0792 · IC95 [+0.0747, +0.0838]
-- tablas **no comparables**: primaria y secundaria contienen el mismo checkpoint en C3 y C2 (la fase B no corrió) → **B3 no se ejecutó**, la coincidencia no es chequeo de robustez
+- tablas **comparables sólo en parte**: 4/8 semillas de C3 siguen con el mismo checkpoint en las dos tablas (extensión en curso) → **B3 todavía no es un chequeo de robustez completo**
 
 ## B1-ter — degradación de C3 al extender (enmienda E-003′, congelada antes de correr)
 
-- **NO APLICA**: la extensión no corrió (ambas tablas a N=2500).
+- **NO APLICA**: extensión EN CURSO (3/8 semillas a N_common=10000; N mínimo = 2500); el criterio se declaró sobre la extensión completa.
 
 ## PS-2 — posición de C3 entre piso y techo (descriptiva)
 
@@ -56,7 +56,7 @@ N_final por condición (convergencia colectiva propia): delta=10000, softmax=250
 ## Protocolo madre
 
 - **P1.1** (C3≈C1 capacidad): softmax en techo → «no evaluable por saturación» (D2).
-- **P1.2** (herencia de correctabilidad): T2(C3) − ½T2(C1) − ½T2(C2) = +0.0132 (≥0 ✓).
+- **P1.2** (herencia de correctabilidad): T2(C3) − ½T2(C1) − ½T2(C2) = +0.0135 (≥0 ✓).
 - **P1.3** (no interferencia): T2(C3) = 0.999 vs min(C1,C2) = 0.972 (sin interferencia ✓).
 
 ---

@@ -44,7 +44,7 @@ def tabla_md(data, titulo):
         if not r:
             continue
         fila = " | ".join(f"{_acc1(r, Lc).mean():.3f}" for Lc in LOADS)
-        L.append(f"| {c} | {fila} | {_t2(r, 32).mean():.3f} | {r[0]['steps']} |")
+        L.append(f"| {c} | {fila} | {_t2(r, 32).mean():.3f} | {an.celda_n(r)} |")
     return L + [""]
 
 
@@ -58,20 +58,17 @@ def aggregate():
 
     evalL = next((L for L in LOADS if _acc1(c2p, L).mean() < 0.95), 128)
     margen = an.margen_efectivo(_acc1(c2p, evalL).std(ddof=1))
-    N_common = max(r[0]["steps"] for r in prim.values() if r)
+    N_common = max(max(an.pasos(r)) for r in prim.values() if r)
 
     n_por_cond = {c: len(prim.get(c) or []) for c in CONDS}
-    mixtos = {c: sorted({r["steps"] for r in (prim.get(c) or [])})
-              for c in CONDS if len({r["steps"] for r in (prim.get(c) or [])}) > 1}
     L = ["# E1 — informe (prereg de seguimiento v1.1) — REGENERADO LOCAL (parcial)", "",
          f"> Regenerado sin JAX desde `resultados/E1/*.json`. Semillas presentes por condición: "
-         f"{n_por_cond}. Las condiciones con <{N_SEEDS} semillas están INCOMPLETAS.", "",
-         (f"> ⚠️ N HETEROGÉNEO dentro de una condición (viola N_common; PS-1/PS-5 NO válidos hasta "
-          f"nivelar): {mixtos}" if mixtos else "> N homogéneo dentro de cada condición."), "",
-         f"**N_common = {N_common}** · **carga de evaluación (desde C2): L{evalL}** · "
-         f"**margen efectivo R11 = {margen:.4f}**", "",
-         "N_final por condición (convergencia colectiva propia): " +
-         ", ".join(f"{c}={ (sec[c][0]['steps'] if sec.get(c) else '—') }" for c in CONDS), ""]
+         f"{n_por_cond}. Las condiciones con <{N_SEEDS} semillas están INCOMPLETAS.", ""]
+    L += an.aviso_n_heterogeneo(prim, CONDS) or ["> N homogéneo dentro de cada condición.", ""]
+    L += [f"**N_common = {N_common}** · **carga de evaluación (desde C2): L{evalL}** · "
+          f"**margen efectivo R11 = {margen:.4f}**", "",
+          "N_final por condición (convergencia colectiva propia): " +
+          ", ".join(f"{c}={ (an.celda_n(sec[c]) if sec.get(c) else '—') }" for c in CONDS), ""]
     L += tabla_md(prim, an.titulo_tabla_primaria(prim, CONDS, N_common))
     L += tabla_md(sec, "Tabla SECUNDARIA — cada condición en su propia convergencia (robustez)")
 

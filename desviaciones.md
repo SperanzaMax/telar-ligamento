@@ -4,6 +4,41 @@ Cada entrada: fecha, motivo, alcance. Se registra **antes** de mirar los resulta
 
 ---
 
+## D-005 · 2026-08-02 · El informe se pronunciaba sobre una campaña a medias (defecto del generador)
+
+**Qué.** Todos los chequeos de estado del agregador leían `runs[0]["steps"]` —la semilla 0— como si
+representara a la condición entera. La fase B extiende **una semilla por vez**, así que apenas
+`mix22 seed0` llegó a 10000, la condición entera pasó por extendida. En el informe del 2026-08-02
+(con 3/8 semillas extendidas) eso produjo cuatro afirmaciones falsas:
+
+1. **B1-ter emitió veredicto** («sin degradación material»), cuando la enmienda E-003′ lo declaró
+   sobre la extensión **completa**. La guarda de «extensión EN CURSO» existía pero no disparaba.
+2. Peor que el pronunciamiento prematuro: la media apareada se calcula sobre las 8 semillas, y las
+   que todavía no se movieron aportan una caída de **exactamente 0 por construcción**. Verificado en
+   test: una degradación real de 0,03 (> umbral 0,0200) en las 3 extendidas se promedia a
+   3·0,03/8 = **0,011 y queda absuelta**. El defecto no sólo hablaba de más: podía **enmascarar una
+   degradación material** y salvar a PS-1 de su propio fusible.
+3. La columna `N` de la tabla primaria decía `10000` para una fila que promedia checkpoints de 2500,
+   7500 y 10000; y el encabezado sacó a `mix22` de la lista de «NO extendidas».
+4. La línea de concordancia declaraba las tablas **CONCORDANTES** con 5/8 pares que siguen siendo
+   copias bit a bit (`cerrar_faseA` congela por `shutil.copyfile`) — el mismo defecto que la
+   auditoría del 27-jul detectó y que se creía resuelto.
+
+**Qué se cambió.** Sólo los **rótulos y las guardas**: todas leen ahora los `steps` de **todas** las
+semillas (helpers `pasos`, `celda_n`, `aviso_n_heterogeneo` en `analisis_e1.py`). El aviso de N
+heterogéneo, que existía en `regenerar_informe_local.py`, se portó al runner de producción, que no lo
+tenía. **No se tocó ningún umbral, criterio ni veredicto del prereg.** B1-ter conserva su 0,0200 y su
+consecuencia automática; ahora simplemente no se pronuncia hasta que las 8 semillas estén a N_common.
+
+**Dirección de conveniencia.** El veredicto que este arreglo **retira** era el favorable («sin
+degradación material», que dejaba PS-1 intacto). El arreglo va contra la conveniencia del ejecutor.
+
+**Alcance.** No afecta datos ni checkpoints: los 48 JSON no se tocan. Afecta cualquier informe
+emitido durante la fase B —el del 2026-08-02 queda **anulado en sus veredictos de B1-ter y de
+concordancia**— y protege el caso en que la campaña se corte antes de completar las 8 semillas.
+Cubierto por `test_agregador_e1.py`, escenario «extensión HETEROGÉNEA» (falla 7/7 contra el código
+previo). Suite completa verde.
+
 ## D-003 · 2026-07-22 · R5 (early stopping) no implementado en la campaña S0.9 — pasos fijos
 
 **Qué.** El runner `fase0_s09.py` corrió con **STEPS=2500 fijos, sin el early stopping por validación** que

@@ -248,13 +248,43 @@ def veredicto_ps5(capacidad, t2, paso_conv):
 
 # ------------------------------------------------- rótulos honestos del informe (E-003′/B1-bis)
 
+def pasos(runs):
+    """Los `steps` de TODAS las semillas de una condición.
+
+    La fase B extiende una semilla por vez, así que durante la campaña una condición es heterogénea:
+    mirar `runs[0]["steps"]` como si representara al conjunto hace que la condición entera pase por
+    extendida en cuanto termina la semilla 0.
+    """
+    return [r["steps"] for r in runs]
+
+
+def celda_n(runs):
+    """La columna `N` de una fila de tabla: un número si es homogénea, el rango si no.
+
+    Una fila promedia las N_SEEDS semillas; rotularla con el `steps` de la semilla 0 la hace pasar
+    por un checkpoint único cuando puede ser una mezcla de checkpoints.
+    """
+    p = pasos(runs)
+    return str(p[0]) if min(p) == max(p) else f"{min(p)}–{max(p)} ⚠"
+
+
+def aviso_n_heterogeneo(prim, conds):
+    """Línea de advertencia si alguna condición mezcla checkpoints (viola N_common)."""
+    mixtos = {c: sorted(set(pasos(prim[c]))) for c in conds
+              if prim.get(c) and len(set(pasos(prim[c]))) > 1}
+    if not mixtos:
+        return []
+    return [f"> ⚠️ **N HETEROGÉNEO dentro de una condición** (viola N_common; PS-1/PS-5 NO válidos "
+            f"hasta nivelar): {mixtos}", ""]
+
+
 def titulo_tabla_primaria(prim, conds, n_common):
     """Encabezado de la tabla primaria, sin afirmar que todas las condiciones están a N_common.
 
     Con la excepción por saturación (B1-bis) una condición puede quedar legítimamente a su N real;
     el encabezado tiene que decirlo, porque la columna `N` de la tabla ya lo dice.
     """
-    sin_extender = [c for c in conds if prim.get(c) and prim[c][0]["steps"] < n_common]
+    sin_extender = [c for c in conds if prim.get(c) and min(pasos(prim[c])) < n_common]
     t = f"Tabla PRIMARIA — N_common = {n_common} (da el veredicto)"
     return t + (f" · † NO extendidas, a su N real: {', '.join(sin_extender)}" if sin_extender
                 else " · todas las condiciones a N_common")
@@ -267,11 +297,16 @@ def linea_concordancia_ps1(prim, sec, c2p, c2s, ps1):
     las condiciones, las dos tablas contienen el MISMO checkpoint y su coincidencia es tautológica:
     reportarla como «concordantes» la haría pasar por un chequeo de robustez que no se hizo.
     """
-    if (prim["mix22"][0]["steps"] == sec["mix22"][0]["steps"]
-            and c2p[0]["steps"] == c2s[0]["steps"]):
+    iguales_c3 = sum(p["steps"] == s["steps"] for p, s in zip(prim["mix22"], sec["mix22"]))
+    iguales_c2 = sum(p["steps"] == s["steps"] for p, s in zip(c2p, c2s))
+    if iguales_c3 == len(prim["mix22"]) and iguales_c2 == len(c2p):
         return ("- tablas **no comparables**: primaria y secundaria contienen el mismo checkpoint "
                 "en C3 y C2 (la fase B no corrió) → **B3 no se ejecutó**, la coincidencia no es "
                 "chequeo de robustez")
+    if iguales_c3:
+        return (f"- tablas **comparables sólo en parte**: {iguales_c3}/{len(prim['mix22'])} semillas "
+                f"de C3 siguen con el mismo checkpoint en las dos tablas (extensión en curso) → "
+                f"**B3 todavía no es un chequeo de robustez completo**")
     return f"- tablas {'CONCORDANTES' if ps1['concordantes'] else 'DISCORDANTES'}"
 
 
@@ -295,16 +330,22 @@ def veredicto_b1ter(c3_prim, c3_sec, umbral=UMBRAL_B1TER, cargas=CARGAS_B1TER, n
     if not c3_prim or not c3_sec:
         return {"veredicto": "no aplica", "motivo": "faltan datos de una de las dos tablas",
                 "caidas": {}, "umbral": umbral}
-    if c3_prim[0]["steps"] == c3_sec[0]["steps"]:
+    p_prim, p_sec = pasos(c3_prim), pasos(c3_sec)
+    if p_prim == p_sec:
         return {"veredicto": "no aplica",
-                "motivo": f"la extensión no corrió (ambas tablas a N={c3_prim[0]['steps']})",
+                "motivo": f"la extensión no corrió (ambas tablas a N={p_prim[0]})",
                 "caidas": {}, "umbral": umbral}
-    # El criterio se declaró sobre la extensión COMPLETA (hasta N_common). Evaluarlo a mitad de
-    # camino daría un veredicto sobre un punto que la enmienda no declaró.
-    if n_common is not None and c3_prim[0]["steps"] < n_common:
+    # El criterio se declaró sobre la extensión COMPLETA (hasta N_common) y sobre las N_SEEDS
+    # semillas. Evaluarlo a mitad de camino daría un veredicto sobre un punto que la enmienda no
+    # declaró; y como la fase B extiende UNA semilla por vez, las que todavía no se movieron
+    # aportan una caída de exactamente 0 a la media apareada, diluyendo el estadístico contra el
+    # umbral. Mientras la extensión no esté completa en TODAS las semillas, no hay veredicto.
+    if n_common is not None and min(p_prim) < n_common:
+        hechas = sum(p >= n_common for p in p_prim)
         return {"veredicto": "no aplica",
-                "motivo": f"extensión EN CURSO (N={c3_prim[0]['steps']} < N_common={n_common}); "
-                          f"el criterio se declaró sobre la extensión completa",
+                "motivo": f"extensión EN CURSO ({hechas}/{len(p_prim)} semillas a N_common="
+                          f"{n_common}; N mínimo = {min(p_prim)}); el criterio se declaró sobre la "
+                          f"extensión completa",
                 "caidas": {}, "umbral": umbral}
 
     caidas = {}
@@ -315,7 +356,7 @@ def veredicto_b1ter(c3_prim, c3_sec, umbral=UMBRAL_B1TER, cargas=CARGAS_B1TER, n
     peor = max(caidas.values())
     v = "DEGRADACIÓN MATERIAL" if peor >= umbral else "sin degradación material"
     return {"veredicto": v, "caidas": caidas, "peor": peor, "umbral": umbral,
-            "N_antes": c3_sec[0]["steps"], "N_despues": c3_prim[0]["steps"]}
+            "N_antes": min(p_sec), "N_despues": min(p_prim)}
 
 
 def lineas_b1ter(res):
