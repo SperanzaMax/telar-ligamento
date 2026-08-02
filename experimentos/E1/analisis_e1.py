@@ -330,6 +330,11 @@ def veredicto_b1ter(c3_prim, c3_sec, umbral=UMBRAL_B1TER, cargas=CARGAS_B1TER, n
     if not c3_prim or not c3_sec:
         return {"veredicto": "no aplica", "motivo": "faltan datos de una de las dos tablas",
                 "caidas": {}, "umbral": umbral}
+    if len(c3_prim) != len(c3_sec):
+        return {"veredicto": "no aplica",
+                "motivo": f"las tablas no están apareadas ({len(c3_prim)} semillas en la primaria vs "
+                          f"{len(c3_sec)} en la secundaria); B1-ter es una comparación apareada",
+                "caidas": {}, "umbral": umbral}
     p_prim, p_sec = pasos(c3_prim), pasos(c3_sec)
     if p_prim == p_sec:
         return {"veredicto": "no aplica",
