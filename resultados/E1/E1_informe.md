@@ -2,7 +2,7 @@
 
 > Regenerado sin JAX desde `resultados/E1/*.json`. Semillas presentes por condición: {'delta': 8, 'softmax': 8, 'mix22': 8}. Las condiciones con <8 semillas están INCOMPLETAS.
 
-> ⚠️ **N HETEROGÉNEO dentro de una condición** (viola N_common; PS-1/PS-5 NO válidos hasta nivelar): {'mix22': [2500, 10000]}
+> ⚠️ **N HETEROGÉNEO dentro de una condición** (viola N_common; PS-1/PS-5 NO válidos hasta nivelar): {'mix22': [2500, 7500, 10000]}
 
 **N_common = 10000** · **carga de evaluación (desde C2): L96** · **margen efectivo R11 = 0.0200**
 
@@ -29,7 +29,7 @@ N_final por condición (convergencia colectiva propia): delta=10000, softmax=250
 - **VEREDICTO: CONFIRMA**
 - primaria (N_common): confirma · dif = +0.0792 · IC95 [+0.0747, +0.0838]
 - secundaria (convergencia propia): confirma · dif = +0.0792 · IC95 [+0.0747, +0.0838]
-- tablas **comparables sólo en parte**: 4/8 semillas de C3 siguen con el mismo checkpoint en las dos tablas (extensión en curso) → **B3 todavía no es un chequeo de robustez completo**
+- tablas **comparables sólo en parte**: 3/8 semillas de C3 siguen con el mismo checkpoint en las dos tablas (extensión en curso) → **B3 todavía no es un chequeo de robustez completo**
 
 ## B1-ter — degradación de C3 al extender (enmienda E-003′, congelada antes de correr)
 
