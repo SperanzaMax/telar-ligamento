@@ -2,7 +2,7 @@
 
 > Regenerado sin JAX desde `resultados/E1/*.json`. Semillas presentes por condición: {'delta': 8, 'softmax': 8, 'mix22': 8}. Las condiciones con <8 semillas están INCOMPLETAS.
 
-> ⚠️ **N HETEROGÉNEO dentro de una condición** (viola N_common; PS-1/PS-5 NO válidos hasta nivelar): {'mix22': [2500, 5000, 10000]}
+> ⚠️ **N HETEROGÉNEO dentro de una condición** (viola N_common; PS-1/PS-5 NO válidos hasta nivelar): {'mix22': [2500, 7500, 10000]}
 
 **N_common = 10000** · **carga de evaluación (desde C2): L96** · **margen efectivo R11 = 0.0200**
 
