@@ -1,11 +1,25 @@
 # Cómo continuar la campaña E1 (una sesión por vez)
 
-> **Estado al 2026-08-01 · lo que falta correr.** La **fase A está CERRADA** (24/24 unidades). Queda la
-> **fase B, sólo para `mix22`**: extenderla de 2500 a `N_common` = 10000. **15,66 h ≈ 5 sesiones.**
-> `softmax` quedó **exceptuada** por la enmienda E-003′ (congelada, `ed8709c2…`, release 21:48:36Z),
-> lo que ahorra ~14 h. `delta` ya está en el tope y no se toca.
+> ## ✅ CAMPAÑA E1 COMPLETA — 2026-08-03. No queda GPU por correr.
 >
-> **En el notebook eso es una sola línea: `FASE = 'B'` en la celda 8.** Ya viene puesta.
+> Fase A cerrada (24/24) **y fase B cerrada**: `mix22` 8/8 a `N_common` = 10000. Las tres condiciones
+> con N homogéneo — `delta` 8/8 @10000, `mix22` 8/8 @10000, `softmax` 8/8 @2500 (exceptuada por la
+> enmienda E-003′, `ed8709c2…`). Los 48 JSON versionados en `resultados/E1/`, commit `5442cac`.
+>
+> **Veredictos:** PS-1 **CONFIRMA** (dif +0,0792 · IC95 [+0,0747, +0,0838] · 4,0× el margen R11) en las
+> dos tablas, concordantes · **B1-ter: sin degradación material** (caída apareada +0,0000 contra umbral
+> 0,0200) → no sobrescribe a PS-1 · PS-2 f=1,001 · PS-4 confirma sus tres partes · **PS-5 no
+> concluyente** (T2 no evaluable a L96, fallback cross-carga a L32) · P1.2 +0,0139 ✓ · P1.3 ✓.
+>
+> **Limitación que va al paper:** la peor celda de toda la grilla de `mix22` es 0,999512 → su capacidad
+> está **censurada por el techo**, no medida. PS-1 es **cota inferior**, y su enunciado correcto es sobre
+> `delta`: «delta sola no alcanza a estas cargas; la hibridación restituye el techo».
+>
+> **Lo único que queda del lado del notebook:** correr la **celda 9** una vez para emitir el informe
+> definitivo (el de `resultados/E1/E1_informe.md` lo regeneró `regenerar_informe_local.py`, que se
+> auto-rotula «parcial» por venir sin JAX). No hace falta GPU.
+>
+> Lo de abajo queda como **registro del procedimiento** de la campaña, ya ejecutado.
 
 ## Lo único que cambió respecto de la vez pasada
 
