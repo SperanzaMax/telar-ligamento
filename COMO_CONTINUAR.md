@@ -19,6 +19,38 @@
 > definitivo (el de `resultados/E1/E1_informe.md` lo regeneró `regenerar_informe_local.py`, que se
 > auto-rotula «parcial» por venir sin JAX). No hace falta GPU.
 >
+> ---
+>
+> ## ▶ Lo que SÍ queda por correr: `mix13` (~5-6 h de T4)
+>
+> Promovida a **confirmatoria** por la enmienda **E-004** (congelada 2026-08-03, SHA `6662724c…`,
+> tag firmado, release 2026-08-04T01:44:44Z, antes de que existiera un solo dato suyo). Es
+> **bloqueante del paper de E1**: el claim de cota inferior no se puede redactar sin ella.
+>
+> **En el notebook es una sola línea, en la celda 7a:**
+>
+> ```python
+> PLAN = 'MIX13'
+> ```
+>
+> Eso deriva solo el resto: `CONDS=mix13`, freno en fase A (mix13 arranca de cero, no es una
+> extensión), y **carpeta propia en Drive** (`ligamento_e1_mix13`) para que ningún veredicto de E1
+> se recompute. Las celdas 7b, 8, 8b y 9 leen esa perilla: no pueden quedar desincronizadas.
+>
+> Secuencia: celdas **1→7** → **7a** (la perilla) → **7b** (sincroniza) → **8**. La 8b muestra el
+> avance sin GPU. Son **8 unidades** de 2500 pasos, ~2 sesiones.
+>
+> Al terminar, la **celda 9** deja de emitir el informe de E1 y ejecuta
+> `experimentos/E1/evaluar_e004.py`: compara `mix13` contra `delta` @10000 apareado por semilla e
+> imprime **cuál de las tres filas de la tabla congelada se cumple** y qué puede afirmar el paper.
+> La fila la decide la tabla, no quien la lee.
+>
+> *Nota de estimación:* la celda 8b dirá ~6 h la primera vez porque el planificador todavía no tiene
+> costo medido de `mix13` y usa el de referencia; se auto-calibra tras la primera unidad. El
+> presupuesto del dictamen era 5,1 h.
+>
+> ---
+>
 > Lo de abajo queda como **registro del procedimiento** de la campaña, ya ejecutado.
 
 ## Lo único que cambió respecto de la vez pasada
