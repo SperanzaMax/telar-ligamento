@@ -14,6 +14,20 @@ sha256sum ENMIENDA_E-004_mix13_20260803.md
 python3 experimentos/verificar_anclas.py --requiere E-004
 ```
 
+## Ancla pública — timestamps server-side de GitHub (inatacables)
+
+| evento | timestamp (UTC) |
+|---|---|
+| push a `main` | **2026-08-04T01:44:20Z** |
+| release publicada | **2026-08-04T01:44:44Z** |
+
+- Commit: `4bd64de` · Tag firmado: `ligamento-enmienda-e004` (objeto anotado `3cd720b0…`, ED25519,
+  *Good signature* con la clave `SHA256:ykmA9jBYXfxM5g7X8hyw29ZHp4mjbim+zbKYbEKX8OQ`)
+- Release: https://github.com/SperanzaMax/telar-ligamento/releases/tag/ligamento-enmienda-e004
+
+**Estos timestamps los pone el servidor de GitHub, no el autor.** Preceden a la primera unidad de GPU
+de `mix13`, que al momento de este congelamiento no había corrido nunca.
+
 ## Qué congela
 
 La **tabla de interpretación de `mix13`** (§4 del documento): el mapeo de cada resultado posible a lo
