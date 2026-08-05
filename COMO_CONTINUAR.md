@@ -21,33 +21,41 @@
 >
 > ---
 >
-> ## ▶ Lo que SÍ queda por correr: `mix13` (~5-6 h de T4)
+> ## ✅ `mix13` TAMBIÉN CORRIÓ — E-004 cerrada 2026-08-05. **No queda GPU pendiente en E1.**
 >
-> Promovida a **confirmatoria** por la enmienda **E-004** (congelada 2026-08-03, SHA `6662724c…`,
-> tag firmado, release 2026-08-04T01:44:44Z, antes de que existiera un solo dato suyo). Es
-> **bloqueante del paper de E1**: el claim de cota inferior no se puede redactar sin ella.
+> 8/8 semillas en 3 sesiones de Colab T4 (2026-08-04/05), integridad uniforme (T4, 2500 pasos,
+> `converged=true`, 193 493 params). JSON en `resultados/E1_mix13/`, commits `27450f6` + `f1f1bcf`,
+> **pusheados**.
 >
-> **En el notebook es una sola línea, en la celda 7a:**
+> **Veredicto: FILA T** — `evaluar_e004.py` ejecutando la tabla congelada el 2026-08-03 (SHA
+> `6662724c…`, antes del primer dato):
 >
-> ```python
-> PLAN = 'MIX13'
+> ```
+> peor celda de la grilla : déficit 0,000122 — 0 de 144 celdas sobre el umbral 0,0020
+> dif apareada @L96       : +0,0792 · IC95 [+0,0748, +0,0837] · 8/8 semillas > R11
+> ►► FILA T
 > ```
 >
-> Eso deriva solo el resto: `CONDS=mix13`, freno en fase A (mix13 arranca de cero, no es una
-> extensión), y **carpeta propia en Drive** (`ligamento_e1_mix13`) para que ningún veredicto de E1
-> se recompute. Las celdas 7b, 8, 8b y 9 leen esa perilla: no pueden quedar desincronizadas.
+> Qué fijó eso, sin que nadie lo decidiera después: **1 de 4 cabezas softmax ya restituye el techo**
+> → el claim sobre `mix22` baja a **suficiencia, no necesidad**; **PS-3 se queda sin
+> dosis-respuesta** (los tres puntos hibridados saturan); y la censura por techo ahora cubre las
+> tres condiciones → **PS-1 sigue siendo cota inferior**. Detalle en `CIERRE_E1_20260803.md` §5.
 >
-> Secuencia: celdas **1→7** → **7a** (la perilla) → **7b** (sincroniza) → **8**. La 8b muestra el
-> avance sin GPU. Son **8 unidades** de 2500 pasos, ~2 sesiones.
+> **`mix13` deja de ser bloqueante: el paper de E1 se puede redactar.**
 >
-> Al terminar, la **celda 9** deja de emitir el informe de E1 y ejecuta
-> `experimentos/E1/evaluar_e004.py`: compara `mix13` contra `delta` @10000 apareado por semilla e
-> imprime **cuál de las tres filas de la tabla congelada se cumple** y qué puede afirmar el paper.
-> La fila la decide la tabla, no quien la lee.
+> ---
 >
-> *Nota de estimación:* la celda 8b dirá ~6 h la primera vez porque el planificador todavía no tiene
-> costo medido de `mix13` y usa el de referencia; se auto-calibra tras la primera unidad. El
-> presupuesto del dictamen era 5,1 h.
+> ## ▶ Lo único que queda del lado del notebook (sin GPU)
+>
+> **Celda 9 con la perilla de la celda 7a en `PLAN = 'E1_B'`**, una vez. Emite el informe definitivo
+> de E1.
+>
+> ⚠️ **Si dejás `PLAN = 'MIX13'`, la celda 9 vuelve a correr `evaluar_e004.py` en vez del informe de
+> E1.** Hay que mover la perilla. El informe que hay hoy en `resultados/E1/E1_informe.md` se
+> auto-rotula «parcial» porque lo generó `regenerar_informe_local.py` sin JAX.
+>
+> Lo demás que falta es **escritura, no cómputo**: paper de E1, nota de backends v3. Y del lado de
+> E2-E4, antes de tocar GPU: congelar **R-BANDA** y el **range-finding de T5-b** (2 semillas).
 >
 > ---
 >
