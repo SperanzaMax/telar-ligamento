@@ -1,0 +1,18 @@
+==============================================================================
+E-004 · TABLA DE INTERPRETACIÓN DE mix13 (congelada 2026-08-03, SHA 6662724c…)
+==============================================================================
+
+  peor celda de la grilla : déficit 0.000122 (seed 2, L32, k=1)
+  umbral de techo         : 0.0020  (= R11/10, el de B1-bis)
+  dif apareada @L96      : +0.0792 · IC95 [+0.0748, +0.0837] · margen R11 = 0.0200
+  semillas con dif > R11  : 8/8
+
+  ►► FILA T
+
+     La restitución del techo se logra YA CON LA DOSIS MÍNIMA PROBADA (1 de 4 cabezas).
+     El claim sobre mix22 pasa a SUFICIENCIA, NO NECESIDAD, y el costo de la solución queda acotado por arriba en ¼ de las cabezas.
+     PS-3 no obtiene dosis-respuesta: los tres puntos hibridados saturan.
+     La frontera sigue FUERA de la grilla y la limitación de censura se mantiene, ahora sobre las tres condiciones.
+
+La fila la decide la tabla congelada, no el ejecutor. No se relee ni se discute.
+==============================================================================
