@@ -55,6 +55,10 @@ ESCALONES = [
 
 SHA_E005 = "3e6572d2121840dc2fb9262d23a025e1bb131c845b4da75a5d57f1afecef4f0f"
 
+# Medido en la estación de trabajo el 2026-08-05 (3 núcleos, batch 64, softmax). Solo alimenta
+# el dry-run: no interviene en ninguna decisión.
+S_PASO_MEDIDO = {"E-a": 1.815, "E-b": 5.865}
+
 
 def en_banda(acc):
     return BANDA[0] <= acc <= BANDA[1]
@@ -234,10 +238,15 @@ def main():
     if args.dry_run:
         for e in escalones:
             T = 3 * e["L_max"] + 2
-            s_paso = 1.84 * (T / 386) ** 2      # medido en CPU local a L=128 (T=386)
+            s_paso = S_PASO_MEDIDO[e["nombre"]]
+            h = 2 * 1500 * s_paso / 3600
+            cabe = "entra" if h <= args.tope_min / 60 else "NO ENTRA en el tope"
             print(f"{e['nombre']}: NK={e['NK']} VOCAB={e['NK']+69} L_max={e['L_max']} T={T} "
-                  f"→ ~{s_paso:.2f} s/paso · 2 semillas × ~1500 pasos ≈ "
-                  f"{2*1500*s_paso/3600:.1f} h (tope {args.tope_min/60:.1f} h)")
+                  f"→ {s_paso:.2f} s/paso · 2 semillas × ~1500 pasos ≈ "
+                  f"{h:.1f} h (tope {args.tope_min/60:.1f} h) — {cabe}")
+        print("\ns/paso medidos en la estación de trabajo el 2026-08-05, 3 núcleos (taskset 0-2),")
+        print("batch 64, condición softmax. Con 4 núcleos E-a daba 1,84: el cuarto núcleo casi no")
+        print("aporta a este tamaño de modelo, así que acotar la CPU no cuesta tiempo de corrida.")
         print("\n(dry-run: no se entrenó nada)")
         return 0
 
