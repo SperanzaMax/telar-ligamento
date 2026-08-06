@@ -18,17 +18,20 @@ python3 experimentos/verificar_anclas.py --requiere E-005
 
 | evento | timestamp (UTC) |
 |---|---|
-| push a `main` | *(pendiente — se completa al publicar)* |
-| release publicada | *(pendiente — se completa al publicar)* |
+| push a `main` | **2026-08-06T00:10:10Z** |
+| release publicada | *(pendiente — falta el tag firmado)* |
 
-- Commit: *(pendiente)* · Tag firmado previsto: `ligamento-enmienda-e005`
+- Commit: `d6af405` · Tag firmado previsto: `ligamento-enmienda-e005`
 - Release prevista: https://github.com/SperanzaMax/telar-ligamento/releases/tag/ligamento-enmienda-e005
+
+El timestamp del push lo devuelve la API de eventos de GitHub
+(`repos/SperanzaMax/telar-ligamento/events`, `PushEvent` con `head = d6af405`), no el autor.
 
 **Estos timestamps los pone el servidor de GitHub, no el autor.** Deben preceder a la **primera hora
 de calibración**, que al momento de este congelamiento no ha corrido nunca. Sin ellos la regla sería
 una fecha escrita por quien ya podría haber visto dónde cae el borde.
 
-> ⚠️ **Mientras estos campos digan «pendiente», la calibración no está habilitada a correr.** El
+> ⚠️ **El push ya está anclado (2026-08-06T00:10:10Z), pero falta el tag firmado.** El
 > ancla local (SHA-256) protege contra alteración posterior, pero no es oponible a terceros: eso lo da
 > el timestamp del servidor.
 
