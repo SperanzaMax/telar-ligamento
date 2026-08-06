@@ -33,6 +33,13 @@ watch_telegram.sh
 *watch_telegram*.sh
 *.secret
 .env
+# Red de contencion: cualquier script que avise por Telegram. El 2026-08-06,
+# barrido_d.sh llego a la puerta del commit con el token en claro sin matchear
+# ninguna regla de arriba (se saneo antes de entrar: ahora lee el token de
+# ~/.config/ligamento/telegram.secret). Los scripts saneados se fuerzan con
+# `git add -f`; el default es no versionarlos.
+*telegram*.sh
+*_tg.sh
 
 # --- LaTeX: auxiliares regenerables ---
 *.aux

@@ -1,0 +1,21 @@
+{
+  "tipo": "sondeo exploratorio \u2014 no elige r\u00e9gimen",
+  "d": 8,
+  "DH": 2,
+  "L_max": 64,
+  "seed": 0,
+  "pasos": 500,
+  "tope": 1000,
+  "convergio": true,
+  "interpretable": true,
+  "minutos": 2.18,
+  "params": 6309,
+  "medidas": {
+    "8": 0.02978515625,
+    "16": 0.024169921875,
+    "32": 0.022216796875,
+    "48": 0.020100911458333336,
+    "64": 0.01812744140625
+  },
+  "en_banda": []
+}

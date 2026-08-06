@@ -1,0 +1,65 @@
+{
+  "tipo": "range-finding sin veredictos",
+  "enmienda": "E-005",
+  "sha_enmienda": "3e6572d2121840dc2fb9262d23a025e1bb131c845b4da75a5d57f1afecef4f0f",
+  "banda": [
+    0.5,
+    0.8
+  ],
+  "k": 1,
+  "condicion": "softmax",
+  "semillas": [
+    0,
+    1
+  ],
+  "tope_pasos": 2500,
+  "parada": "por convergencia",
+  "escalones": [
+    {
+      "escalon": "E-a",
+      "NK": 256,
+      "L_max": 128,
+      "medidas": {
+        "8": 1.0,
+        "16": 1.0,
+        "32": 1.0,
+        "64": 1.0,
+        "96": 1.0,
+        "128": 0.9999542236328125
+      },
+      "por_semilla": {
+        "0": {
+          "8": 1.0,
+          "16": 1.0,
+          "32": 1.0,
+          "64": 1.0,
+          "96": 1.0,
+          "128": 0.999908447265625
+        },
+        "1": {
+          "8": 1.0,
+          "16": 1.0,
+          "32": 1.0,
+          "64": 1.0,
+          "96": 1.0,
+          "128": 1.0
+        }
+      },
+      "cumple": false,
+      "cargas_en_banda": [],
+      "biseccion_cerrada": true,
+      "pasos": {
+        "0": 1000,
+        "1": 1000
+      },
+      "seg": 5219.825463294983
+    }
+  ],
+  "rama": "R4",
+  "regimen_elegido": null,
+  "veredicto": "R4 — DECISIÓN SUSPENDIDA: el tope se agotó con la bisección ABIERTA. No se elige régimen y E2 NO arranca. Esto NO es un resultado sobre la física del modelo: es presupuesto insuficiente, y el escalón E-b cuesta ~4x por paso que E-a. Se retoma con presupuesto adicional declarado, continuando la bisección desde donde quedó — no se reinicia ni se reinterpreta. Leer R4 como R3 seria convertir una restriccion de credito en un hallazgo.",
+  "hardware": {
+    "platform": "cpu",
+    "device_kind": "cpu"
+  }
+}
