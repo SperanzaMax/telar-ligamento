@@ -17,7 +17,7 @@ Vocab: importado de datos (E-001, VOCAB=197).
 import numpy as np
 import jax, jax.numpy as jnp
 from functools import partial
-from datos import VOCAB
+from datos import VOCAB, V_E001
 
 # --- dimensiones (§5) ---
 D, H, DH = 64, 4, 16
@@ -39,11 +39,13 @@ def glorot(key, shape):
     return jax.random.uniform(key, shape, minval=-lim, maxval=lim)
 
 
-def init_params(seed, kind):
+def init_params(seed, kind, vocab=VOCAB):
+    """`vocab` permite el régimen extendido de R-BANDA (E-005). Con el default reproduce E-001
+    bit a bit: el consumo de claves PRNG no depende del tamaño del vocabulario, solo las formas."""
     ks = jax.random.split(jax.random.PRNGKey(seed), 128); i = iter(range(128))
-    p = {'emb': jax.random.normal(ks[next(i)], (VOCAB, D)) * 0.02,
+    p = {'emb': jax.random.normal(ks[next(i)], (vocab, D)) * 0.02,
          'ln_f': {'g': jnp.ones(D), 'b': jnp.zeros(D)},
-         'head': {'w': glorot(ks[next(i)], (D, VOCAB)), 'b': jnp.zeros(VOCAB)},
+         'head': {'w': glorot(ks[next(i)], (D, vocab)), 'b': jnp.zeros(vocab)},
          'blocks': []}
     for _ in range(NB):
         blk = {'ln1': {'g': jnp.ones(D), 'b': jnp.zeros(D)},

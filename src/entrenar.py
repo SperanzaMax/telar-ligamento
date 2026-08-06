@@ -11,14 +11,14 @@ import jax, jax.numpy as jnp
 from functools import partial
 import optax
 
-from datos import gen_mqar, gen_overwrite, PAD, IGNORE, V0, NV
+from datos import gen_mqar, gen_overwrite, PAD, IGNORE, V0, NV, V_E001
 import modelos
 from modelos import forward, init_params, count_params
 
 
-def _pad_to(x, y, T):
+def _pad_to(x, y, T, voc=V_E001):
     B = x.shape[0]
-    xp = np.full((B, T), PAD, np.int32); yp = np.full((B, T), IGNORE, np.int32)
+    xp = np.full((B, T), voc.PAD, np.int32); yp = np.full((B, T), IGNORE, np.int32)
     xp[:, :x.shape[1]] = x; yp[:, :y.shape[1]] = y
     return xp, yp
 
@@ -85,7 +85,7 @@ def train(kind, steps, seed=0, batch=64, lr=3e-3, max_load=16, t_max=None, log_e
     return params, hist
 
 
-def eval_capacity(params, kind, loads, seed=1234, batch=64, reps=4, topk=(1, 4, 16)):
+def eval_capacity(params, kind, loads, seed=1234, batch=64, reps=4, topk=(1, 4, 16), voc=V_E001):
     """acc@k por carga sobre T1. Devuelve {L: {k: acc}}."""
     rng = np.random.default_rng(seed)
     fwd = jax.jit(partial(forward, kind=kind))
@@ -93,15 +93,15 @@ def eval_capacity(params, kind, loads, seed=1234, batch=64, reps=4, topk=(1, 4, 
     for L in loads:
         accs = {k: [] for k in topk}
         for _ in range(reps):
-            x, y = gen_mqar(rng, batch, L)
+            x, y = gen_mqar(rng, batch, L, voc=voc)
             t_max = 3 * L + 2
-            xp, yp = _pad_to(x, y, t_max)
+            xp, yp = _pad_to(x, y, t_max, voc=voc)
             logits = np.array(fwd(params, jnp.array(xp)))            # (B,T,VOCAB)
             m = yp >= 0
             # restringir a columnas de valor del vocab para la lectura (V0..V0+NV)
-            val_logits = logits[..., V0:V0 + NV]
-            order = np.argsort(-val_logits, axis=-1)                  # top índices (0..NV-1)
-            true = np.where(m, yp - V0, -1)
+            val_logits = logits[..., voc.V0:voc.V0 + voc.NV]
+            order = np.argsort(-val_logits, axis=-1)                  # top índices (0..voc.NV-1)
+            true = np.where(m, yp - voc.V0, -1)
             for k in topk:
                 topk_idx = order[..., :k]
                 hit = (topk_idx == true[..., None]).any(-1)
@@ -110,14 +110,15 @@ def eval_capacity(params, kind, loads, seed=1234, batch=64, reps=4, topk=(1, 4, 
     return out
 
 
-def _val_acc(params, kind, val_loads=(64, 96, 128), seed=7777, batch=64, reps=2):
+def _val_acc(params, kind, val_loads=(64, 96, 128), seed=7777, batch=64, reps=2, voc=V_E001):
     """Val-acc para el criterio de convergencia: media de acc@1 sobre las cargas discriminantes."""
-    cap = eval_capacity(params, kind, loads=list(val_loads), seed=seed, reps=reps, topk=(1,))
+    cap = eval_capacity(params, kind, loads=list(val_loads), seed=seed, reps=reps, topk=(1,), voc=voc)
     return float(np.mean([cap[L][1] for L in val_loads]))
 
 
 def train_resumable(cond, seed, target_steps, ckpt_path, max_load=128, lr=3e-3, batch=64,
-                    val_loads=(64, 96, 128), val_every=500, log_every=500, n_buckets=None):
+                    val_loads=(64, 96, 128), val_every=500, log_every=500, n_buckets=None,
+                    voc=V_E001, parar_al_converger=False, tol_conv=0.005):
     """Entrena hasta target_steps reanudando desde ckpt_path si existe (params + opt_state + rng + step +
     val_hist). Evalúa val-acc cada `val_every` pasos. Guarda checkpoint al terminar. Determinista por semilla:
     train_resumable(...,N) == entrenar de corrido hasta N (mismos batches y estado). Devuelve (params, val_hist).
@@ -146,28 +147,36 @@ def train_resumable(cond, seed, target_steps, ckpt_path, max_load=128, lr=3e-3, 
         if start >= target_steps:
             return params, val_hist
     else:
-        params = init_params(seed, cond)
+        params = init_params(seed, cond, vocab=voc.VOCAB)
         state = opt.init(params)
         rng = np.random.default_rng(seed)
         start, val_hist = 0, []
 
     t0 = time.time()
+    paso_alcanzado = target_steps
     for s in range(start + 1, target_steps + 1):
         if s % 2 == 0:
-            L = int(rng.integers(4, max_load + 1)); x, y, _ = gen_overwrite(rng, batch, L, r=max(1, L // 2))
+            L = int(rng.integers(4, max_load + 1)); x, y, _ = gen_overwrite(rng, batch, L, r=max(1, L // 2), voc=voc)
         else:
-            L = int(rng.integers(2, max_load + 1)); x, y = gen_mqar(rng, batch, L)
+            L = int(rng.integers(2, max_load + 1)); x, y = gen_mqar(rng, batch, L, voc=voc)
         T = t_max if n_buckets is None else _bucket_T(x.shape[1], t_max, n_buckets)
-        xp, yp = _pad_to(x, y, T)
+        xp, yp = _pad_to(x, y, T, voc=voc)
         params, state, l, a = train_step(params, state, jnp.array(xp), jnp.array(yp), cond)
         if s % val_every == 0:
-            va = _val_acc(params, cond, val_loads=val_loads)
+            va = _val_acc(params, cond, val_loads=val_loads, voc=voc)
             val_hist.append({"step": s, "val_acc": va})
             print(f"[{cond} s{seed}] step {s:5d} val_acc {va:.4f} ({time.time()-t0:.0f}s)", flush=True)
+            # E-005 §4: la calibración corta al converger en vez de gastar el tope entero.
+            # Apagado por defecto: las campañas de E1 corren hasta target_steps como siempre.
+            if parar_al_converger and converged(val_hist, s, window=val_every, tol=tol_conv):
+                paso_alcanzado = s
+                print(f"[{cond} s{seed}] CORTE POR CONVERGENCIA en {s} "
+                      f"(mejora < {tol_conv} en los ultimos {val_every} pasos)", flush=True)
+                break
     # guardar checkpoint (numpy para portabilidad del pickle)
     ck = {"params": jax.tree_util.tree_map(np.asarray, params),
           "opt_state": jax.tree_util.tree_map(np.asarray, state),
-          "rng_state": rng.bit_generator.state, "step": target_steps, "val_hist": val_hist}
+          "rng_state": rng.bit_generator.state, "step": paso_alcanzado, "val_hist": val_hist}
     with open(ckpt_path, "wb") as f:
         pickle.dump(ck, f)
     return params, val_hist
@@ -181,20 +190,20 @@ def converged(val_hist, target_steps, window=500, tol=0.005):
     return (at[target_steps] - at[target_steps - window]) < tol
 
 
-def eval_overwrite(params, kind, L=32, seed=4321, batch=64, reps=4):
+def eval_overwrite(params, kind, L=32, seed=4321, batch=64, reps=4, voc=V_E001):
     """Correctabilidad (T2): acc@1 sobre las claves REASIGNADAS (responder el valor nuevo)."""
     from datos import gen_overwrite
     rng = np.random.default_rng(seed)
     fwd = jax.jit(partial(forward, kind=kind))
     accs = []
     for _ in range(reps):
-        x, y, upd = gen_overwrite(rng, batch, L, r=L // 2)
+        x, y, upd = gen_overwrite(rng, batch, L, r=L // 2, voc=voc)
         t_max = 4 * L + 2
-        xp, yp = _pad_to(x, y, t_max)
+        xp, yp = _pad_to(x, y, t_max, voc=voc)
         um = np.zeros_like(yp, dtype=bool); um[:, -L:] = upd
         logits = np.array(fwd(params, jnp.array(xp)))
-        pred = logits[..., V0:V0 + NV].argmax(-1)
-        true = np.where(yp >= 0, yp - V0, -1)
+        pred = logits[..., voc.V0:voc.V0 + voc.NV].argmax(-1)
+        true = np.where(yp >= 0, yp - voc.V0, -1)
         m = (yp >= 0) & um
         accs.append(((pred == true) & m).sum() / max(m.sum(), 1))
     return float(np.mean(accs))

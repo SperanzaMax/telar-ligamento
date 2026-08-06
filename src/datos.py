@@ -11,65 +11,79 @@ Alcance de este archivo: T1 (MQAR), T2 (sobreescritura), T3 (polisémico). T4 y 
 implementarán al llegar a E3/E4 (prioridad E1>E2>E3>E4, §0.10).
 """
 import numpy as np
+from collections import namedtuple
 
-# --- Vocabulario (enmienda E-001) ---
-NK, NV = 128, 64            # pools de claves y valores
-K0, V0 = 0, 128            # offsets: claves 0..127, valores 128..191
-BOS, SEP, PAD = 192, 193, 194
-CTX_A, CTX_B = 195, 196     # tokens de contexto de T3 (sentido a/b)
-VOCAB = 197
-IGNORE = -100               # etiqueta ignorada en la pérdida
+# --- Vocabulario parametrizable (enmienda E-005: la calibración de R-BANDA necesita NK > 128) ---
+# El layout es el mismo de E-001 y se deriva de (NK, NV): claves [0,NK), valores [NK,NK+NV),
+# y los 5 especiales al final. Con (128, 64) reproduce E-001 exactamente — ver test_regimen_e001_intacto.
+Vocab = namedtuple("Vocab", "NK NV K0 V0 BOS SEP PAD CTX_A CTX_B VOCAB")
+
+
+def hacer_vocab(nk=128, nv=64):
+    """Mapa de tokens para un pool de nk claves y nv valores. hacer_vocab(128,64) == E-001."""
+    assert nk >= 1 and nv >= 2, "NV≥2: gen_overwrite y gen_polysemic necesitan un valor alternativo"
+    base = nk + nv
+    return Vocab(nk, nv, 0, nk, base, base + 1, base + 2, base + 3, base + 4, base + 5)
+
+
+V_E001 = hacer_vocab(128, 64)          # el régimen congelado por E-001, default de todo el pipeline
+
+# Constantes de módulo, derivadas del default. Se conservan para no tocar a los llamadores
+# (entrenar.py, modelos.py, tests). Un régimen distinto se pasa por el kwarg `voc`, nunca
+# reasignando estas.
+NK, NV, K0, V0, BOS, SEP, PAD, CTX_A, CTX_B, VOCAB = V_E001
+IGNORE = -100               # etiqueta ignorada en la pérdida (no depende del vocabulario)
 
 
 # =====================================================================================
 # T1 — MQAR estándar
 # =====================================================================================
-def gen_mqar(rng, B, L):
+def gen_mqar(rng, B, L, voc=V_E001):
     """T1. Layout: BOS (k v)*L SEP q*L ; pérdida solo en las columnas de query.
     L claves DISTINTAS por fila (muestreadas de NK), valores i.i.d. de NV.
     Devuelve (x, y) de forma (B, 3L+2)."""
-    assert L <= NK, f"L={L} excede el pool de claves NK={NK} (E-001)"
+    assert L <= voc.NK, f"L={L} excede el pool de claves NK={voc.NK}"
     T = 3 * L + 2
-    keys = np.argsort(rng.random((B, NK)), axis=1)[:, :L]      # L únicas por fila
-    vals = rng.integers(0, NV, size=(B, L))
-    x = np.full((B, T), PAD, dtype=np.int32)
+    keys = np.argsort(rng.random((B, voc.NK)), axis=1)[:, :L]      # L únicas por fila
+    vals = rng.integers(0, voc.NV, size=(B, L))
+    x = np.full((B, T), voc.PAD, dtype=np.int32)
     y = np.full((B, T), IGNORE, dtype=np.int32)
-    x[:, 0] = BOS
-    x[:, 1:2 * L + 1:2] = K0 + keys
-    x[:, 2:2 * L + 2:2] = V0 + vals
-    x[:, 2 * L + 1] = SEP
+    x[:, 0] = voc.BOS
+    x[:, 1:2 * L + 1:2] = voc.K0 + keys
+    x[:, 2:2 * L + 2:2] = voc.V0 + vals
+    x[:, 2 * L + 1] = voc.SEP
     perm = np.argsort(rng.random((B, L)), axis=1)              # orden de consulta aleatorio
     qk = np.take_along_axis(keys, perm, axis=1)
     qv = np.take_along_axis(vals, perm, axis=1)
-    x[:, 2 * L + 2:] = K0 + qk
-    y[:, 2 * L + 2:] = V0 + qv
+    x[:, 2 * L + 2:] = voc.K0 + qk
+    y[:, 2 * L + 2:] = voc.V0 + qv
     return x, y
 
 
 # =====================================================================================
 # Control de fuga (S0 sanidad): query de clave cuyo par NUNCA se almacenó
 # =====================================================================================
-def gen_mqar_leakage(rng, B, L, h):
+def gen_mqar_leakage(rng, B, L, h, voc=V_E001):
     """Como T1 pero se ALMACENAN solo (L-h) pares; las queries incluyen h claves 'holdout' cuyo
     par (k,v) nunca se presentó. El value target de esas queries existe pero el modelo no lo vio:
     si acierta por encima del azar (1/NV), hay fuga (atajo posicional/espurio, no lookup real).
     Devuelve (x, y, absent_mask) con absent_mask (B,L) True en las queries holdout."""
-    assert h < L <= NK
+    assert h < L <= voc.NK
     store = L - h
     T = 2 * store + 2 + L
-    keys = np.argsort(rng.random((B, NK)), axis=1)[:, :L]      # L claves únicas
-    vals = rng.integers(0, NV, size=(B, L))
-    x = np.full((B, T), PAD, dtype=np.int32)
+    keys = np.argsort(rng.random((B, voc.NK)), axis=1)[:, :L]      # L claves únicas
+    vals = rng.integers(0, voc.NV, size=(B, L))
+    x = np.full((B, T), voc.PAD, dtype=np.int32)
     y = np.full((B, T), IGNORE, dtype=np.int32)
-    x[:, 0] = BOS
-    x[:, 1:2 * store + 1:2] = K0 + keys[:, :store]            # solo se almacenan los primeros `store`
-    x[:, 2:2 * store + 2:2] = V0 + vals[:, :store]
-    x[:, 2 * store + 1] = SEP
+    x[:, 0] = voc.BOS
+    x[:, 1:2 * store + 1:2] = voc.K0 + keys[:, :store]            # solo se almacenan los primeros `store`
+    x[:, 2:2 * store + 2:2] = voc.V0 + vals[:, :store]
+    x[:, 2 * store + 1] = voc.SEP
     perm = np.argsort(rng.random((B, L)), axis=1)             # consulta las L claves, barajadas
     qk = np.take_along_axis(keys, perm, axis=1)
     qv = np.take_along_axis(vals, perm, axis=1)
-    x[:, 2 * store + 2:] = K0 + qk
-    y[:, 2 * store + 2:] = V0 + qv
+    x[:, 2 * store + 2:] = voc.K0 + qk
+    y[:, 2 * store + 2:] = voc.V0 + qv
     is_absent = (np.arange(L)[None, :] >= store).repeat(B, 0)  # índices holdout = los últimos h
     absent_mask = np.take_along_axis(is_absent, perm, axis=1)
     return x, y, absent_mask
@@ -78,31 +92,31 @@ def gen_mqar_leakage(rng, B, L, h):
 # =====================================================================================
 # T2 — MQAR con sobreescritura (correctabilidad)
 # =====================================================================================
-def gen_overwrite(rng, B, L, r=None):
+def gen_overwrite(rng, B, L, r=None, voc=V_E001):
     """T2. L pares base; luego r eventos que REASIGNAN las primeras r claves a un valor
     nuevo (garantizado distinto). Query a las L claves; target = último valor escrito.
     Devuelve (x, y, upd_mask) donde upd_mask marca, por columna de query, si esa clave
     fue reasignada."""
     if r is None:
         r = L // 2
-    assert L <= NK and r <= L
+    assert L <= voc.NK and r <= L
     E = L + r
     T = 2 * E + 2 + L
-    keys = np.argsort(rng.random((B, NK)), axis=1)[:, :L]
-    v1 = rng.integers(0, NV, size=(B, L))
-    v2 = (v1[:, :r] + 1 + rng.integers(0, NV - 1, size=(B, r))) % NV   # distinto de v1
+    keys = np.argsort(rng.random((B, voc.NK)), axis=1)[:, :L]
+    v1 = rng.integers(0, voc.NV, size=(B, L))
+    v2 = (v1[:, :r] + 1 + rng.integers(0, voc.NV - 1, size=(B, r))) % voc.NV   # distinto de v1
     ek = np.concatenate([keys, keys[:, :r]], axis=1)
     ev = np.concatenate([v1, v2], axis=1)
-    x = np.full((B, T), PAD, dtype=np.int32)
+    x = np.full((B, T), voc.PAD, dtype=np.int32)
     y = np.full((B, T), IGNORE, dtype=np.int32)
-    x[:, 0] = BOS
-    x[:, 1:2 * E + 1:2] = K0 + ek
-    x[:, 2:2 * E + 2:2] = V0 + ev
-    x[:, 2 * E + 1] = SEP
+    x[:, 0] = voc.BOS
+    x[:, 1:2 * E + 1:2] = voc.K0 + ek
+    x[:, 2:2 * E + 2:2] = voc.V0 + ev
+    x[:, 2 * E + 1] = voc.SEP
     final = v1.copy(); final[:, :r] = v2
     perm = np.argsort(rng.random((B, L)), axis=1)
-    x[:, 2 * E + 2:] = K0 + np.take_along_axis(keys, perm, axis=1)
-    y[:, 2 * E + 2:] = V0 + np.take_along_axis(final, perm, axis=1)
+    x[:, 2 * E + 2:] = voc.K0 + np.take_along_axis(keys, perm, axis=1)
+    y[:, 2 * E + 2:] = voc.V0 + np.take_along_axis(final, perm, axis=1)
     updated = (np.arange(L)[None, :] < r).repeat(B, 0)
     upd_mask = np.take_along_axis(updated, perm, axis=1)
     return x, y, upd_mask
@@ -111,7 +125,7 @@ def gen_overwrite(rng, B, L, r=None):
 # =====================================================================================
 # T3 — MQAR polisémico (ambigüedad graduada)
 # =====================================================================================
-def gen_polysemic(rng, B, L, rho):
+def gen_polysemic(rng, B, L, rho, voc=V_E001):
     """T3. Señal de contexto (CTX_A/CTX_B) en la posición 1. Una fracción rho de las L
     claves son POLISÉMICAS: su valor depende del contexto (2 sentidos, v_a y v_b, distintos).
     El resto son monosémicas (valor único, igual en ambos contextos).
@@ -122,33 +136,32 @@ def gen_polysemic(rng, B, L, rho):
 
     Propiedad de diseño (S0.3): con el contexto enmascarado, la acc máxima alcanzable sobre
     las claves polisémicas es 50% (los dos sentidos son equiprobables e indistinguibles)."""
-    assert L <= NK and 0.0 <= rho <= 1.0
-    T = 2 * L + 3                      # BOS + CTX + 2L + SEP + L queries = 3 + 3L? see below
+    assert L <= voc.NK and 0.0 <= rho <= 1.0
     # posiciones: 0=BOS, 1=CTX, luego (k v)*L (2L), luego SEP (1), luego q*L (L)
     T = 2 + 2 * L + 1 + L
     n_poly = int(round(rho * L))
-    keys = np.argsort(rng.random((B, NK)), axis=1)[:, :L]
+    keys = np.argsort(rng.random((B, voc.NK)), axis=1)[:, :L]
     ctx_bit = rng.integers(0, 2, size=B)               # 0 -> sentido a, 1 -> sentido b
     # valores: sentido a y sentido b por clave; para monosémicas v_a == v_b
-    va = rng.integers(0, NV, size=(B, L))
+    va = rng.integers(0, voc.NV, size=(B, L))
     vb = va.copy()
     # las primeras n_poly columnas (posición en la secuencia base) son polisémicas
     if n_poly > 0:
-        alt = (va[:, :n_poly] + 1 + rng.integers(0, NV - 1, size=(B, n_poly))) % NV
+        alt = (va[:, :n_poly] + 1 + rng.integers(0, voc.NV - 1, size=(B, n_poly))) % voc.NV
         vb[:, :n_poly] = alt
     is_poly = np.zeros((B, L), dtype=bool); is_poly[:, :n_poly] = True
     active = np.where(ctx_bit[:, None] == 0, va, vb)   # valor efectivo según contexto
 
-    x = np.full((B, T), PAD, dtype=np.int32)
+    x = np.full((B, T), voc.PAD, dtype=np.int32)
     y = np.full((B, T), IGNORE, dtype=np.int32)
-    x[:, 0] = BOS
-    x[:, 1] = np.where(ctx_bit == 0, CTX_A, CTX_B)
-    x[:, 2:2 * L + 2:2] = K0 + keys
-    x[:, 3:2 * L + 2:2] = V0 + active
-    x[:, 2 * L + 2] = SEP
+    x[:, 0] = voc.BOS
+    x[:, 1] = np.where(ctx_bit == 0, voc.CTX_A, voc.CTX_B)
+    x[:, 2:2 * L + 2:2] = voc.K0 + keys
+    x[:, 3:2 * L + 2:2] = voc.V0 + active
+    x[:, 2 * L + 2] = voc.SEP
     perm = np.argsort(rng.random((B, L)), axis=1)
-    x[:, 2 * L + 3:] = K0 + np.take_along_axis(keys, perm, axis=1)
-    y[:, 2 * L + 3:] = V0 + np.take_along_axis(active, perm, axis=1)
+    x[:, 2 * L + 3:] = voc.K0 + np.take_along_axis(keys, perm, axis=1)
+    y[:, 2 * L + 3:] = voc.V0 + np.take_along_axis(active, perm, axis=1)
     poly_mask = np.take_along_axis(is_poly, perm, axis=1)
     return x, y, poly_mask
 
@@ -156,9 +169,9 @@ def gen_polysemic(rng, B, L, rho):
 # =====================================================================================
 # Tests de propiedades de diseño (§4, S0.3)
 # =====================================================================================
-def _query_cols(x):
+def _query_cols(x, voc=V_E001):
     """Índices de columnas de query = tras el último SEP hasta el final."""
-    sep_pos = int(np.argmax(x[0] == SEP))
+    sep_pos = int(np.argmax(x[0] == voc.SEP))
     return np.arange(sep_pos + 1, x.shape[1])
 
 
@@ -244,8 +257,81 @@ def test_polysemic_monosemic_context_invariance():
     print("  ok test_polysemic_monosemic_context_invariance (fracción poly ≈ rho)")
 
 
+# --- Régimen E-001 intacto y régimen extendido (enmienda E-005) --------------------------------
+# Fixture congelado ANTES de parametrizar el vocabulario. Si cualquiera de estos 13 hashes cambia,
+# los datos del régimen viejo cambiaron y los resultados de E1 dejarían de ser reproducibles.
+_REF_E001 = {
+    ("mqar", 8): "8ada20647e1cc993", ("mqar", 16): "dd0c4e502cef6da0",
+    ("mqar", 32): "dca92ec74af7762f", ("mqar", 64): "74ec717e4cb2d247",
+    ("mqar", 96): "a68b7695ef1b5464", ("mqar", 128): "670299e94a812181",
+    ("overwrite", 16): "16f04f6ae19a99c4", ("overwrite", 32): "361f23c422ad6fc4",
+    ("overwrite", 64): "34a8bb603cca6c55",
+    ("poly", 16, 0.0): "bbd2752c421ad96e", ("poly", 32, 0.5): "360e8b5c01d28d3b",
+    ("poly", 64, 1.0): "024308c66bd9d169",
+    ("leak", 32, 8): "4f6da7209c726cfb",
+}
+
+
+def _hash(*arrs):
+    import hashlib
+    m = hashlib.sha256()
+    for a in arrs:
+        m.update(np.ascontiguousarray(a).tobytes())
+    return m.hexdigest()[:16]
+
+
+def test_regimen_e001_intacto():
+    """El vocabulario parametrizable NO cambia un solo byte del régimen congelado por E-001."""
+    assert tuple(V_E001) == (128, 64, 0, 128, 192, 193, 194, 195, 196, 197)
+    assert (NK, NV, K0, V0, BOS, SEP, PAD, CTX_A, CTX_B, VOCAB) == tuple(V_E001)
+    for L in (8, 16, 32, 64, 96, 128):
+        r = np.random.default_rng(12345)
+        assert _hash(*gen_mqar(r, 32, L)) == _REF_E001[("mqar", L)], f"gen_mqar cambió a L={L}"
+    for L in (16, 32, 64):
+        r = np.random.default_rng(999)
+        assert _hash(*gen_overwrite(r, 32, L)) == _REF_E001[("overwrite", L)], f"gen_overwrite cambió a L={L}"
+    for L, rho in ((16, 0.0), (32, 0.5), (64, 1.0)):
+        r = np.random.default_rng(777)
+        assert _hash(*gen_polysemic(r, 32, L, rho)) == _REF_E001[("poly", L, rho)], f"gen_polysemic cambió"
+    r = np.random.default_rng(55)
+    assert _hash(*gen_mqar_leakage(r, 32, 32, 8)) == _REF_E001[("leak", 32, 8)], "gen_mqar_leakage cambió"
+    # pasar el default explícito tiene que dar exactamente lo mismo que omitirlo
+    a = gen_mqar(np.random.default_rng(3), 16, 32)
+    b = gen_mqar(np.random.default_rng(3), 16, 32, voc=V_E001)
+    assert _hash(*a) == _hash(*b)
+    print("  ok test_regimen_e001_intacto (13 hashes + default explícito)")
+
+
+def test_vocab_extendido():
+    """Los escalones de R-BANDA (E-005 §3.1): NK 256 y 512 generan datos válidos y consistentes."""
+    for nk, l_max in ((256, 128), (512, 256)):
+        voc = hacer_vocab(nk, 64)
+        assert voc.VOCAB == nk + 64 + 5 and voc.V0 == nk
+        assert len(set(voc[4:9])) == 5, "los 5 especiales deben ser distintos entre sí"
+        assert voc.BOS >= voc.V0 + voc.NV, "los especiales no pueden pisar el pool de valores"
+        assert l_max <= voc.NK // 2, "restricción de no degeneración de E-005 §3.1"
+        rng = np.random.default_rng(0)
+        x, y = gen_mqar(rng, 16, l_max, voc=voc)
+        assert x.min() >= 0 and x.max() < voc.VOCAB
+        kcols = x[:, 1:2 * l_max + 1:2] - voc.K0
+        for row in kcols:
+            assert len(np.unique(row)) == l_max, f"claves repetidas a NK={nk}, L={l_max}"
+        yv = y[y != IGNORE]
+        assert (yv >= voc.V0).all() and (yv < voc.V0 + voc.NV).all()
+        assert (y != IGNORE).sum(axis=1).max() == l_max
+        # distractores: con L = NK/2 queda la mitad del pool sin usar en cada fila
+        usados = len(np.unique(kcols[0]))
+        assert usados == l_max and usados < voc.NK, "sin distractores el régimen degenera (E-005 §3.1)"
+        # T3 y T2 también deben funcionar en el régimen nuevo
+        gen_polysemic(rng, 8, min(l_max, 32), 0.5, voc=voc)
+        gen_overwrite(rng, 8, min(l_max, 32), voc=voc)
+    print("  ok test_vocab_extendido (NK 256 y 512, con distractores y sin colisión de especiales)")
+
+
 def run_all():
-    print("Tests de generadores «Ligamento» (vocab E-001: 128/64/5 = 197)")
+    print("Tests de generadores «Ligamento» (default E-001: 128/64/5 = 197)")
+    test_regimen_e001_intacto()
+    test_vocab_extendido()
     test_vocab_bounds()
     test_mqar_unique_keys_and_recall()
     test_overwrite_targets_are_new_values()
