@@ -1,5 +1,13 @@
 # Handoff a Fable5 — 2026-08-06
 
+> **RESUELTO el 2026-08-06 · ver `DICTAMEN_20260806.md`.** Las tres devoluciones recibidas (Z.ai,
+> Kimi K2.6, Opus5 Max) se integraron y la respuesta no está en el menú que plantea §6: **la
+> bifurcación A/C no existe**. R3 —la rama cuya consecuencia (a) es la salida C y cuya consecuencia
+> (b) es la salida A— exige *«bisección cerrada en **ambos** escalones»*, y **E-b nunca corrió**. Lo
+> que corresponde es **correr E-b**, con las 3 h ya pre-asignadas en el tope congelado y en T4
+> (la calibración declara hardware indistinto). Dos apartados de este handoff quedaron corregidos
+> abajo (§2 retirado, §4 refundado).
+
 **Qué se necesita de vos:** una decisión sobre **cómo sigue E2–E4** después de que la calibración de
 E-005 corrió y devolvió **R4**, y de que el sondeo posterior mostró que **el espacio candidato de
 E-005 no contiene ningún régimen usable**. Hay tres salidas y ninguna es obvia (§6).
@@ -43,10 +51,19 @@ reentrenar (4 min):
 |---|---|---|---|---|---|
 | acc@1 | 1.0000 | 1.0000 | 0.9999 | 1.0000 | 0.9999 |
 
-**Vale como evidencia fuerte por asimetría:** el sondeo juega doble en contra del modelo
+> **⚠ CORREGIDO el 2026-08-06 — ver `DICTAMEN_20260806.md` §3. Este apartado NO autoriza a
+> saltearse E-b, y su conclusión queda retirada.** Tres defectos: (i) el sondeo movió `L` pero no
+> `NK`, y **E-b es el par (NK=512, L_max=256)** — sólo se probó media dimensión; (ii) las celdas
+> L=192 y 256 con NK=256 violan `L_max ≤ NK/2`, la restricción de no degeneración que la propia
+> enmienda §3.1 señala como causa de que *«la celda tope del régimen viejo mida mal»*; (iii) la
+> asimetría está **mal signada**: menos distractores es una tarea **más fácil**, así que juega a
+> favor de la accuracy alta observada, no en contra. Mover `NK` sin reentrenar es imposible (el
+> embedding de E-a tiene 325 filas, NK=512 exige 581). **E-b hay que entrenarlo.**
+
+~~**Vale como evidencia fuerte por asimetría:** el sondeo juega doble en contra del modelo
 —extrapolación fuera de L≤128 y sin los distractores de E-005 §3.1— y aun así no se despeina. Un
 entrenamiento propio a L=256 rendiría **más**, así que **E-b tampoco alcanzaría la banda**. Se
-ahorraron 3–5 h de cómputo.
+ahorraron 3–5 h de cómputo.~~
 
 Para cruzar por este eje con d=64 haría falta L≈380–600. Con el costo yendo como T², eso son
 **cientos de horas**: no es falta de presupuesto, es inalcanzable a cualquier presupuesto de Maxi.
@@ -119,8 +136,20 @@ final da 0,03–0,06 (azar). **Pero la curva cuenta otra cosa:**
 objeción conceptual: con d=8 cada cabeza tiene DH=2, y una cabeza delta escribe en un estado de
 **2×2 = 4 números** contra los 256 de E1. La regla delta no se sostiene a esa escala.
 
-**Por qué mata el régimen:** cualquier veredicto de P2.2 dependería de **en qué paso se evalúa**. Es
-un grado de libertad inadmisible, y no lo arregla ninguna enmienda sobre la banda.
+**Por qué mata el régimen** ~~cualquier veredicto de P2.2 dependería de **en qué paso se evalúa**. Es
+un grado de libertad inadmisible, y no lo arregla ninguna enmienda sobre la banda.~~
+
+> **⚠ CORREGIDO el 2026-08-06 — ver `DICTAMEN_20260806.md` §6.** El argumento tachado es atacable:
+> mejor-checkpoint-por-validación es una regla **pre-declarable** que resuelve justamente esa
+> objeción. Las razones que sí aguantan son otras tres: (1) con DH=2 la regla delta escribe en un
+> estado de **4 números** — lo que P2.2 mediría es un colapso numérico, no la hipótesis; (2) el
+> máximo sobre la trayectoria está **sesgado de forma diferencial entre condiciones** cuando una
+> colapsa y la otra no, que es el caso; (3) en `d=8` el baseline nunca supera 95 %, así que la regla
+> de instanciación de la carga de evaluación no aplica. B queda cerrada por dos vías independientes.
+>
+> Nota adicional: `softmax` **también** se degrada del pico al final en este régimen (s0 0,792@9000
+> → 0,7635; s3 0,6562@12000 → 0,5796). La inestabilidad es del régimen, no de `mix22`, y la tabla de
+> §3.3 usa el checkpoint del paso 16000, no el mejor — las SD de §3.3 pueden estar infladas por eso.
 
 **Lección metodológica que hay que incorporar:** el ejecutor pasó a N fijo sin corte para escapar del
 problema de §3.2 y cayó en el opuesto —entrenar hasta el colapso—. Ninguno de los dos extremos

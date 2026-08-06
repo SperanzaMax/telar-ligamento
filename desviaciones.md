@@ -4,6 +4,67 @@ Cada entrada: fecha, motivo, alcance. Se registra **antes** de mirar los resulta
 
 ---
 
+## D-006 · 2026-08-06 · Erratas del veredicto R4 y alcance real del corte por convergencia
+
+Entrada **append-only**: no modifica ningún artefacto congelado. `verificar_anclas.py --requiere E-005`
+verde antes y después.
+
+### (a) El texto de R4 no cubre el caso que efectivamente ocurrió
+
+El veredicto emitido dice *«el tope se agota con la bisección ABIERTA»*, pero el registro técnico de la
+corrida del 2026-08-06 tiene `biseccion_cerrada: true`: en E-a la bisección **cerró** y ninguna carga
+entró en la banda. Lo que impidió declarar R3 fue que el **espacio de escalones quedó incompleto** —E-b
+no se corrió—, no una bisección abierta.
+
+La lógica de `decidir()` es **correcta**: sin E-b corrido no puede declarar R3, porque R3 exige
+«bisección cerrada en **ambos** escalones», y su única salida restante es R4. Lo que no cubre el caso es
+la **redacción** del veredicto. Se deja constancia para revisores; el artefacto no se toca.
+
+### (b) Causa raíz de que E-b no corriera: el costo por paso se subestimó un 44 %
+
+No es un ítem separado del anterior, es su causa. El bench del 2026-08-05 dio 1,815 s/paso para E-a;
+la corrida real midió **2,60 s/paso**. Con esa corrección, el plan de E-b pasa a ≈4,9 h de estación de
+trabajo contra un tope congelado de 3 h por escalón: **no entraba, y por eso el espacio de escalones
+quedó incompleto**. Todo presupuesto futuro usa el número medido, no el del bench.
+
+### (c) El corte por convergencia se dispara dentro de mesetas — alcance acotado por medición
+
+En el sondeo exploratorio de `d` (ver `resultados/sondeo_d/RESUMEN_sondeo_d_20260806.json`), `d=8` fue
+rotulado «convergido» a nivel azar con ventana 250 / tol 0,005; reentrenado sin corte estuvo **750 pasos
+en meseta y después despegó** hasta 0,40. Es una instancia fresca e independiente del error que la
+auditoría del 2026-07-27 halló en el borrador del preprint, y la razón de ser de `stoppower`.
+
+**Nota importante sobre el alcance, porque la lectura fácil es errónea.** El criterio de D-004 usa
+ventana **500**, no 250 — pero la meseta observada duró **750 pasos**, así que *también* se habría
+disparado dentro de ella. La inmunidad de las campañas firmadas **no** viene del criterio, y las dos
+razones que suelen darse son inexactas:
+
+- «E1 usó R5 (paciencia 2000)» — **falso**: D-003 registra que R5 no se implementó; Fase 0 corrió con
+  pasos fijos y el criterio de D-004.
+- «se cerró con oráculo closed-form» — **cierto para TELAR-03, no para E1**.
+
+La razón que sí se sostiene, y es verificable, es que el patrón **sólo puede afectar corridas cortadas
+lejos del techo**: un modelo en meseta a nivel azar tiene a dónde despegar, uno saturado no. Chequeo
+dirigido sobre los `N` de la campaña E1 (hecho, no inferido):
+
+| condición | N final | qué decidió el N | expuesta |
+|---|---|---|---|
+| `softmax` | 2500 en 8/8 | el criterio de D-004 | **no** — acc@1 ∈ [0,9995 · 1,0000], en el techo: no hay despegue posible |
+| `delta` | 10000 en 8/8 | tope duro | no — el criterio no decidió |
+| `mix22` | 10000 (fase B) | tope duro | no — el criterio no decidió |
+
+Ninguna corrida firmada queda expuesta. **No se revisan E1 ni TELAR-03.**
+
+**Lección que sí se adopta, y es más fuerte que subir topes:** no se usa corte por meseta de accuracy en
+esta familia de tareas —ningún tope arregla un criterio que se dispara adentro de la meseta—. El criterio
+para regímenes de baja capacidad es **mejor checkpoint por validación**, con grilla pre-declarada,
+selección en validación y reporte en test held-out, más un **flag de divergencia**: se registran pico,
+paso del pico y valor final, y si el final cae por debajo del pico menos k·SD el run se rotula
+*inestable* en vez de tomarse el pico en silencio. Sin ese flag, «mejor checkpoint» es una puerta
+trasera. Nada de esto es aflojamiento: es explicitar lo que R5 ya pretendía.
+
+---
+
 ## D-005 · 2026-08-02 · El informe se pronunciaba sobre una campaña a medias (defecto del generador)
 
 **Qué.** Todos los chequeos de estado del agregador leían `runs[0]["steps"]` —la semilla 0— como si
