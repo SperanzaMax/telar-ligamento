@@ -1,0 +1,328 @@
+\documentclass[jou,11pt,donotrepeattitle]{apa7}
+% APA 7th edition. Compilar:  latexmk -pdf e1_hibridacion.tex
+\usepackage[american]{babel}
+\usepackage{csquotes}
+\usepackage[style=apa,backend=biber]{biblatex}
+\DeclareLanguageMapping{american}{american-apa}
+\addbibresource{referencias.bib}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{siunitx}
+
+\title{One Softmax Head in Four Restores Ceiling Recall: A Pre-Registered
+Replication with a Censored Effect and an Unreachable Frontier}
+\shorttitle{One Softmax Head in Four}
+\leftheader{Speranza}
+
+\author{Maximiliano Speranza}
+\affiliation{Independent Researcher, Argentina}
+
+\authornote{\addORCIDlink{Maximiliano Speranza}{0009-0005-0413-8554}
+This work was carried out independently, without institutional affiliation, supervision, or
+funding. The author is an undergraduate student of the University Technical Degree in
+Programming (\emph{Tecnicatura Universitaria en Programaci\'on}, TUP) at Universidad
+Tecnol\'ogica Nacional (UTN), Argentina, and a graduate of its Diploma in Artificial
+Intelligence; neither programme sponsored or supervised this study, which is reported here in
+a personal capacity. Correspondence concerning this article should be addressed to Maximiliano
+Speranza. E-mail: maximiliano.speranza@gmail.com.
+Every prediction reported here was pre-registered and frozen with a cryptographic hash and a
+public timestamp \emph{before} the corresponding data were collected; the amendments that
+extended the protocol were frozen the same way, each before the run it governs. The author
+declares no competing interests and received no funding. Code, raw results, and the analysis
+scripts that reproduce every number are publicly available (see Open Practices).}
+
+\abstract{%
+Linear-attention architectures trade the quadratic cost of softmax attention for a
+fixed-size recurrent state, and pay for it with a capacity ceiling on associative recall.
+Hybridizing the two along the head axis is an established remedy. We report a pre-registered
+replication that quantifies it, and two results that the pre-registration forced us to state
+against our own interest. First, in a multi-query associative recall benchmark at
+$d_{\text{model}}=64$ with four heads, the delta-rule condition falls to $.921$ and $.820$
+accuracy at loads 96 and 128, while every hybrid condition sits at $1.000$; the paired
+difference at the pre-registered evaluation load is $+.0792$, $95\%$ CI $[+.0747, +.0838]$,
+four times the pre-registered margin, positive in eight of eight seeds. Second, the minimum
+dose tested---one softmax head in four---already restores the ceiling (worst cell deficit
+$1.22\times10^{-4}$), so the claim about the two-head mixture is one of \emph{sufficiency,
+not necessity}, and the cost of the remedy is bounded above at one quarter of the heads.
+Critically, the effect is \emph{censored}: all hybrid conditions saturate, so $+.0792$ is a
+lower bound and the measured statement is about the delta rule---\emph{it falls below ceiling
+at loads where hybrids do not}---not about how much better hybrids are. A pre-registered
+calibration then searched for a regime with dynamic range, and failed under its own rules:
+doubling the key pool and the load left the reference condition at $1.000$, so the frontier is
+unreachable at this scale and the equivalence prediction it would have served is recorded as
+\emph{not run}, never as confirmed. We argue the durable contribution is the pre-registration
+itself, and report the ledger of conveniences it refused.}
+
+\keywords{linear attention, associative recall, pre-registration, hybrid attention,
+ceiling effects, replication}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+Attention with a softmax kernel compares every query against every key, which costs
+$O(n^2)$ in sequence length but places no architectural bound on how many associations a
+layer can retrieve. Linear attention replaces the comparison with a fixed-size recurrent
+state updated online, which costs $O(n)$ and does place such a bound: the state has a finite
+number of slots, and when the number of stored associations approaches that number, retrieval
+degrades. This trade-off is well established, and so is the remedy of mixing the two
+mechanisms within a layer \parencite{arora2023zoology,arora2024simple,yang2024gated}. It has
+since been demonstrated at scale: \textcite{tan2026hydrahead} hybridize full and linear
+attention along the head axis and report large gains at long context.
+
+\textbf{This paper does not claim the mechanism as novel.} It was already known when our
+protocol was frozen, and \textcite{tan2026hydrahead} appeared a month before it. What we
+contribute is a measurement of it under rules written in advance, which is rare in this
+literature, and three consequences of taking those rules seriously:
+
+\begin{enumerate}
+  \item The remedy saturates at the smallest dose we tested---\emph{one head in four}---so the
+        usual two-and-two mixture is sufficient but not necessary, and the price of the fix is
+        bounded above at a quarter of the heads.
+  \item The headline number is \emph{censored by a ceiling}, which changes what it means. We
+        report the corrected statement rather than the flattering one.
+  \item A pre-registered attempt to escape the ceiling failed under its own criteria, and the
+        prediction it would have served is recorded as not run.
+\end{enumerate}
+
+\section{Method}
+
+\subsection{Pre-registration}
+
+The protocol was frozen on 2026-07-22 (SHA-256 \texttt{2f8ebb82\dots}) and deposited with a DOI
+before any comparison condition was trained. A follow-up pre-registration for the comparison
+reported here was frozen on 2026-07-23 (SHA-256 \texttt{0b93a36f\dots}) with a signed tag and a
+server-side timestamp preceding every run it governs. Two later amendments---one adding the
+minimum-dose condition, one specifying the regime search---were each frozen, hashed, and
+publicly anchored before the run they authorize. A gate script re-hashes all frozen artifacts
+and refuses to launch if any differs.
+
+\subsection{Task and conditions}
+
+The benchmark is multi-query associative recall: a sequence presents $L$ key--value pairs
+followed by queries, and the model must return the value bound to each queried key. Load $L$
+is the number of stored pairs; a pool of $N_K$ keys supplies distractors that never appear.
+Accuracy is top-1 exactness on the queried positions.
+
+All conditions share one architecture ($d_{\text{model}}=64$, four heads, RMSNorm per head)
+and differ only in which heads use which mechanism: \textbf{softmax} (four softmax heads),
+\textbf{delta} (four delta-rule heads), \textbf{mix22} (two and two), and \textbf{mix13}
+(\emph{one} softmax head and three delta-rule heads). Parameter counts are identical by
+construction; FLOPs are not, and cannot be---softmax is $O(n^2)$ and the delta rule is
+$O(n)$---so the pre-registration equalizes parameters, reports FLOPs, and declares the
+direction of the bias: the hybrids run at a \emph{compute disadvantage} relative to pure
+softmax, which makes any confirmation conservative.
+
+\subsection{Margins, seeds, and the evaluation load}
+
+Eight seeds per condition. The equivalence margin is not a fixed number but a rule fixed in
+advance: $R_{11} = \max(.02,\ 1.5\times \text{SD across seeds of the reference})$, instantiated
+and recorded before any comparison condition was inspected; here it evaluates to $.0200$.
+Differences are paired by seed. The evaluation load is likewise defined by rule---the smallest
+load at which the reference falls below $95\%$---which yields $L=96$.
+
+A three-verdict scheme is used throughout: \emph{difference}, \emph{equivalence}, or
+\emph{inconclusive}. Neither equivalence nor difference is ever declared by default.
+
+\section{Results}
+
+\subsection{The delta rule falls below ceiling; every hybrid does not}
+
+Table~\ref{tab:main} gives accuracy by load at the common budget.
+
+\begin{table}[htbp]
+\centering
+\caption{Top-1 accuracy by load, eight seeds, common budget $N=10{,}000$.}
+\label{tab:main}
+\begin{tabular}{lcccccc}
+\toprule
+condition & $L8$ & $L16$ & $L32$ & $L64$ & $L96$ & $L128$ \\
+\midrule
+delta   & 1.000 & 1.000 & 1.000 & .985 & \textbf{.921} & \textbf{.820} \\
+softmax & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 \\
+mix22   & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 \\
+mix13   & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The delta-rule condition is the only one that leaves the ceiling, and it does so
+monotonically with load. At the pre-registered evaluation load the paired difference between
+the two-and-two mixture and the delta rule is $+.0792$, $95\%$ CI $[+.0747, +.0838]$, which is
+$4.0\times$ the pre-registered margin of $.0200$ and positive in eight of eight seeds. The
+prediction is confirmed in both the primary and the secondary table, and the pre-registered
+discordance rule---which would have downgraded the verdict had the two tables disagreed---did
+not fire. An independent re-implementation of the statistic, written without importing any of
+the analysis code and using only the standard library, reproduces the mean exactly and the
+confidence interval within Monte Carlo noise.
+
+\subsection{One head in four is enough}
+
+The minimum-dose condition was added by a frozen amendment carrying an interpretation table
+written \emph{before} the run: each possible outcome was mapped in advance to the claim it
+would license. The outcome fell in the row where the hybrid restores the ceiling at the
+smallest dose tested. Its worst cell across the entire grid is a deficit of
+$1.22\times10^{-4}$ from unity---within the $R_{11}/10$ tolerance fixed for ``at ceiling''---and
+its paired difference against the delta rule at $L96$ is $+.0792$,
+$95\%$ CI $[+.0748, +.0837]$, again eight of eight seeds.
+
+Two consequences follow, and the frozen table states both:
+
+\begin{itemize}
+  \item The claim about \texttt{mix22} becomes one of \textbf{sufficiency, not necessity}. Two
+        softmax heads restore the ceiling, but so does one; the experiment does not license
+        ``two are needed.'' The cost of the remedy is bounded above at a quarter of the heads.
+  \item \textbf{No dose--response curve is obtained.} All three hybridized points saturate, so
+        the monotonicity prediction cannot be evaluated. This is reported as not evaluable, not
+        as confirmed.
+\end{itemize}
+
+\subsection{What the number actually means: censoring}
+
+It is tempting to report $+.0792$ as ``the hybrid outperforms the delta rule by eight points.''
+That reading is wrong, and the pre-registration is what caught it.
+
+Every hybrid condition sits at the ceiling across the whole grid---the worst cell of
+\texttt{mix22} anywhere is $.999512$. Its capacity is therefore not measured but
+\textbf{censored}: we observe that it has not yet failed, not how far it is from failing. An
+instrument that saturates cannot report the magnitude of what exceeds it.
+
+The measured statement is consequently about the \emph{delta rule}:
+
+\begin{quote}
+The delta rule alone falls below ceiling at loads where hybrid conditions do not.
+\end{quote}
+
+and $+.0792$ is a \textbf{lower bound} on a difference whose true value is unknown and may be
+much larger. This is a weaker claim about the hybrid than the raw number suggests, and a
+sharper one about the linear-attention baseline. It is also, we note, a different claim from
+those in the scaled hybrid literature, which report end-task gains rather than a bound on where
+a pure linear-attention baseline first fails.
+
+\subsection{Secondary predictions}
+
+The pre-registered descriptive statistic placing the hybrid between the two pure conditions
+gives $f = (C_3-C_2)/(C_1-C_2) = 1.001$: the hybrid is exactly at the softmax ceiling, which is
+the censoring above restated.
+
+The prediction about where degradation begins is confirmed in all three of its parts: onset at
+median $L_0 = 64$; strict monotonicity of degradation with load ($\rho = -1.000$); and an
+accelerating rather than linear decay ($+.0361$, $95\%$ CI $[+.0335, +.0390]$).
+
+The prediction of an anticorrelation between capacity and correctability is \textbf{not
+conclusive} and is reported as such. Its intended test was not evaluable at the evaluation load
+(the reference SD fell below the pre-registered usability threshold), so the pre-specified
+fallback applied, which makes the comparison cross-load; the resulting correlation is $-.455$
+with a confidence interval that crosses zero. A diagnostic pre-registered for exactly this
+purpose rules out the stopping-point confound as the explanation, leaving statistical power as
+the limitation. With eight seeds the study cannot resolve it.
+
+\section{The frontier is not reachable at this scale}
+
+The censoring above has an obvious remedy: find a regime where the reference has dynamic range,
+and re-run the comparison there. A rule for choosing such a regime was frozen before any
+calibration data existed. It specifies a target band for reference accuracy---$[.50, .80]$,
+where the upper edge is $1-10R_{11}$ rather than a matter of taste---an ordered, enumerated
+search space of two regimes, a compute budget split in two declared halves, and four exhaustive
+outcome branches.
+
+Both rungs were run. The first ($N_K=256$, $L\le128$) returned $1.000$ at every load. The
+second ($N_K=512$, $L\le256$)---double the key pool and double the load, retrained from
+scratch---returned the values in Table~\ref{tab:rungs}: still at ceiling everywhere, worst cell
+$.9999$.
+
+\begin{table}[htbp]
+\centering
+\caption{Reference accuracy on the second calibration rung ($N_K=512$).}
+\label{tab:rungs}
+\begin{tabular}{lcccccccc}
+\toprule
+$L$ & 8 & 16 & 32 & 64 & 96 & 128 & 192 & 256 \\
+\midrule
+acc@1 & 1.000 & 1.000 & .9999 & 1.000 & 1.000 & 1.000 & 1.000 & .9999 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+With both rungs closed and neither meeting the band, the frozen decision procedure emits its
+third branch: the frontier lies beyond what this budget can measure at this $d_{\text{model}}$.
+The consequences were written in advance and are mechanical. The equivalence prediction that
+required a non-saturated regime is recorded as \textbf{not run---never as confirmed}, on the
+explicit ground that running it in a saturated regime yields a row that cannot fail. Reducing
+$d_{\text{model}}$ is routed to a future campaign as documented redesign, because shrinking it
+breaks the ``same architecture'' invariant that makes campaigns comparable.
+
+We stress the asymmetry that makes this reportable rather than embarrassing. The branch was not
+chosen after seeing the result; it was one of four written before any calibration data existed,
+together with the rule that distinguishes it from ``we ran out of budget''---a distinction that
+mattered, because an earlier reading of the same evidence would have declared the frontier
+unreachable while one rung remained unrun. Running it cost seventeen minutes of a T4.
+
+An exploratory search outside the frozen space (varying $d_{\text{model}}$, reported here only
+to document why it is not pursued) found the regime degenerate rather than merely difficult: at
+$d_{\text{model}}=8$ each head writes into a state of four numbers, and the hybrid condition
+becomes \emph{unstable rather than incapable}---it peaks near $.52$ and then collapses. A
+comparison there would measure numerical collapse, not the hypothesis.
+
+\section{The ledger of conveniences}
+
+If the durable contribution of this work is the pre-registration rather than the mechanism,
+then the honest way to report it is to publish what the rules refused, not only what they
+allowed. We list the decisions where the frozen protocol ran against our interest.
+
+\begin{itemize}
+  \item \textbf{A tempting headline was downgraded.} ``The hybrid beats the delta rule by eight
+        points'' became ``the delta rule falls where hybrids do not, by at least eight points,''
+        because the hybrid was censored.
+  \item \textbf{A claim of necessity became one of sufficiency} when the minimum dose worked,
+        under an interpretation table written before the run.
+  \item \textbf{A prediction was retired rather than reported.} A stopping rule we had proposed
+        would have halted training while the model was still improving; it was withdrawn and
+        replaced by a power-based rule, and the replacement was declared non-retroactive.
+  \item \textbf{An amendment that would have exempted a condition from extension was rewritten}
+        after an audit found its threshold excluded the very condition it was written for.
+  \item \textbf{An inconclusive result stayed inconclusive.} The capacity--correctability
+        prediction could have been reported as a trend; its interval crosses zero, so it is
+        reported as underpowered.
+  \item \textbf{A defense of a safeguard was withdrawn} when it was found to compare a
+        between-regime displacement against within-regime noise, and replaced by a measured
+        one.
+\end{itemize}
+
+Two further measurements are worth recording because they bear on how such comparisons should
+be reported. First, an internal stopping criterion---frozen with a DOI before data
+collection---was later shown to be undetectable in principle at the achieved signal-to-noise
+ratio, a result reported separately. Second, changing the compute backend (CPU versus a T4
+GPU), with seed, data, and code held fixed, moves validation accuracy by roughly $30\%$ of the
+decision margin in the late training regime. Studies that report ``mean $\pm$ SD over $N$
+seeds'' omit a term of comparable order.
+
+\section{Limitations}
+
+The censoring is the central one: the magnitude of the hybrid advantage is not measured, only
+bounded below, and the calibration established that no accessible regime removes the ceiling on
+this task at this scale. The result therefore transfers to the two other tasks in the programme
+only as a hypothesis---the frozen rule that governs the regime search says so explicitly, since
+those tasks carry their own chance level and difficulty.
+
+The anticorrelation prediction is underpowered at eight seeds. The common training budget is
+declared rather than derived: the delta-rule condition had not converged at the pre-registered
+cap in three of eight seeds, so it is reported as a fixed declared budget, which biases against
+that condition and is therefore conservative for the confirmed prediction. Finally, this is a
+small-scale study ($\sim$$10^5$ parameters, synthetic task); it quantifies a mechanism under
+controlled conditions and does not establish end-task gains at scale, for which the reader
+should consult the scaled literature cited above.
+
+\section{Open practices}
+
+Protocol, follow-up pre-registration, and all amendments are public, hashed, signed, and
+timestamped, each anchored before the run it governs. Raw per-seed results, the analysis code,
+an independent re-implementation of the headline statistic, and the calibration records are in
+the public repository. Every number in this paper is reproducible from the deposited artifacts;
+the analysis scripts run without a GPU.
+
+\printbibliography
+
+\end{document}
