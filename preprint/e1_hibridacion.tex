@@ -106,8 +106,8 @@ followed by queries, and the model must return the value bound to each queried k
 is the number of stored pairs; a pool of $N_K$ keys supplies distractors that never appear.
 Accuracy is top-1 exactness on the queried positions.
 
-All conditions share one architecture ($d_{\text{model}}=64$, four heads, RMSNorm per head)
-and differ only in which heads use which mechanism: \textbf{softmax} (four softmax heads),
+All conditions share one architecture ($193{,}493$ parameters; $d_{\text{model}}=64$, four heads,
+RMSNorm per head) and differ only in which heads use which mechanism: \textbf{softmax} (four softmax heads),
 \textbf{delta} (four delta-rule heads), \textbf{mix22} (two and two), and \textbf{mix13}
 (\emph{one} softmax head and three delta-rule heads). Parameter counts are identical by
 construction; FLOPs are not, and cannot be---softmax is $O(n^2)$ and the delta rule is
@@ -294,7 +294,7 @@ allowed. We list the decisions where the frozen protocol ran against our interes
 Two further measurements are worth recording because they bear on how such comparisons should
 be reported. First, an internal stopping criterion---frozen with a DOI before data
 collection---was later shown to be undetectable in principle at the achieved signal-to-noise
-ratio, a result reported separately. Second, changing the compute backend (CPU versus a T4
+ratio \parencite{speranza2026stopping}. Second, changing the compute backend (CPU versus a T4
 GPU), with seed, data, and code held fixed, moves validation accuracy by roughly $30\%$ of the
 decision margin in the late training regime. Studies that report ``mean $\pm$ SD over $N$
 seeds'' omit a term of comparable order.
@@ -315,13 +315,14 @@ small-scale study ($\sim$$10^5$ parameters, synthetic task); it quantifies a mec
 controlled conditions and does not establish end-task gains at scale, for which the reader
 should consult the scaled literature cited above.
 
-\section{Open practices}
+\section*{Open Practices}
 
-Protocol, follow-up pre-registration, and all amendments are public, hashed, signed, and
-timestamped, each anchored before the run it governs. Raw per-seed results, the analysis code,
-an independent re-implementation of the headline statistic, and the calibration records are in
-the public repository. Every number in this paper is reproducible from the deposited artifacts;
-the analysis scripts run without a GPU.
+The frozen protocol is deposited with a DOI (10.5281/zenodo.21495252). The follow-up
+pre-registration and all amendments are public, hashed, signed, and timestamped, each anchored
+before the run it governs. Raw per-seed results, the analysis code, an independent
+re-implementation of the headline statistic, and the calibration records are available at
+\url{https://github.com/SperanzaMax/telar-ligamento}. Every number in this paper is reproducible
+from the deposited artifacts; the analysis scripts run on CPU.
 
 \printbibliography
 

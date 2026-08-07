@@ -1,0 +1,354 @@
+\documentclass[jou,11pt,donotrepeattitle]{apa7}
+% APA 7.ª edición — versión en español. Compilar:  latexmk -pdf e1_hibridacion_es.tex
+\usepackage[spanish,es-tabla,es-noquoting]{babel}
+% Punto decimal en todo el documento: los valores deben coincidir digito a digito
+% con la version en ingles, con el repositorio y con la salida de los scripts de analisis.
+\decimalpoint
+\usepackage{csquotes}
+\usepackage[style=apa,backend=biber]{biblatex}
+\DeclareLanguageMapping{spanish}{spanish-apa}
+\addbibresource{referencias.bib}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{siunitx}
+
+\title{Una cabeza \emph{softmax} de cada cuatro restituye la recuperaci\'on en el techo:
+una replicaci\'on pre-registrada con un efecto censurado y una frontera inalcanzable}
+\shorttitle{Una cabeza \emph{softmax} de cada cuatro}
+\leftheader{Speranza}
+
+\author{Maximiliano Speranza}
+\affiliation{Investigador independiente, Argentina}
+
+\authornote{\addORCIDlink{Maximiliano Speranza}{0009-0005-0413-8554}
+Este trabajo se realiz\'o de manera independiente, sin afiliaci\'on institucional, supervisi\'on
+ni financiamiento. El autor es estudiante de la Tecnicatura Universitaria en Programaci\'on
+(TUP) de la Universidad Tecnol\'ogica Nacional (UTN), Argentina, y egresado de su Diplomatura
+en Inteligencia Artificial; ninguna de las dos carreras auspici\'o ni supervis\'o este estudio,
+que se reporta aqu\'i a t\'itulo personal. La correspondencia relativa a este art\'iculo debe
+dirigirse a Maximiliano Speranza. Correo electr\'onico: maximiliano.speranza@gmail.com.
+Cada predicci\'on que se reporta ac\'a fue pre-registrada y congelada con un hash criptogr\'afico
+y una marca temporal p\'ublica \emph{antes} de recolectar los datos correspondientes; las
+enmiendas que extendieron el protocolo se congelaron del mismo modo, cada una antes de la
+corrida que gobierna. El autor declara no tener conflictos de intereses y no recibi\'o
+financiamiento. El c\'odigo, los resultados crudos y los scripts de an\'alisis que reproducen
+cada n\'umero son p\'ublicos (v\'ease Pr\'acticas abiertas).}
+
+\abstract{%
+Las arquitecturas de atenci\'on lineal cambian el costo cuadr\'atico de la atenci\'on
+\emph{softmax} por un estado recurrente de tama\~no fijo, y lo pagan con un techo de capacidad
+en recuperaci\'on asociativa. Hibridar ambos mecanismos a lo largo del eje de cabezas es un
+remedio ya establecido. Reportamos una replicaci\'on pre-registrada que lo cuantifica, y dos
+resultados que el pre-registro nos oblig\'o a enunciar en contra de nuestro propio inter\'es.
+Primero: en un banco de recuperaci\'on asociativa multiconsulta con $d_{\text{model}}=64$ y
+cuatro cabezas, la condici\'on de regla delta cae a $.921$ y $.820$ de exactitud en las cargas
+96 y 128, mientras que todas las condiciones h\'ibridas se mantienen en $1.000$; la diferencia
+apareada en la carga de evaluaci\'on pre-registrada es $+.0792$, IC del $95\%$
+$[+.0747, +.0838]$, cuatro veces el margen pre-registrado, positiva en ocho de ocho semillas.
+Segundo: la dosis m\'inima probada ---una cabeza \emph{softmax} de cada cuatro--- ya restituye
+el techo (peor celda: d\'eficit de $1.22\times10^{-4}$), de modo que la afirmaci\'on sobre la
+mezcla de dos cabezas es de \emph{suficiencia, no de necesidad}, y el costo del remedio queda
+acotado por arriba en un cuarto de las cabezas. Y algo decisivo: el efecto est\'a
+\emph{censurado}. Todas las condiciones h\'ibridas saturan, as\'i que $+.0792$ es una cota
+inferior y el enunciado medido es sobre la regla delta ---\emph{cae por debajo del techo en
+cargas donde las h\'ibridas no caen}---, no sobre cu\'anto mejores son las h\'ibridas. Una
+calibraci\'on pre-registrada busc\'o luego un r\'egimen con rango din\'amico, y fracas\'o bajo
+sus propias reglas: duplicar el conjunto de claves y la carga dej\'o a la condici\'on de
+referencia en $1.000$, de modo que la frontera es inalcanzable a esta escala y la predicci\'on
+de equivalencia a la que hubiera servido queda registrada como \emph{no corrida}, nunca como
+confirmada. Sostenemos que el aporte durable es el pre-registro mismo, y reportamos el libro
+mayor de las conveniencias que rechaz\'o.}
+
+\keywords{atenci\'on lineal, recuperaci\'on asociativa, pre-registro, atenci\'on h\'ibrida,
+efectos de techo, replicaci\'on}
+
+\begin{document}
+\maketitle
+
+\section{Introducci\'on}
+
+La atenci\'on con n\'ucleo \emph{softmax} compara cada consulta contra cada clave, lo que cuesta
+$O(n^2)$ en longitud de secuencia pero no impone ninguna cota arquitect\'onica sobre cu\'antas
+asociaciones puede recuperar una capa. La atenci\'on lineal reemplaza esa comparaci\'on por un
+estado recurrente de tama\~no fijo que se actualiza en l\'inea, lo que cuesta $O(n)$ y s\'i
+impone esa cota: el estado tiene una cantidad finita de casilleros y, cuando el n\'umero de
+asociaciones almacenadas se acerca a esa cantidad, la recuperaci\'on se degrada. El compromiso
+est\'a bien establecido, y tambi\'en lo est\'a el remedio de mezclar ambos mecanismos dentro de
+una capa \parencite{arora2023zoology,arora2024simple,yang2024gated}. Desde entonces se
+demostr\'o a escala: \textcite{tan2026hydrahead} hibridan atenci\'on plena y lineal a lo largo
+del eje de cabezas y reportan mejoras grandes en contextos largos.
+
+\textbf{Este art\'iculo no reclama el mecanismo como novedoso.} Ya se conoc\'ia cuando nuestro
+protocolo se congel\'o, y \textcite{tan2026hydrahead} apareci\'o un mes antes. Lo que aportamos
+es una medici\'on hecha bajo reglas escritas de antemano ---algo poco frecuente en esta
+literatura--- y tres consecuencias de tomarse esas reglas en serio:
+
+\begin{enumerate}
+  \item El remedio satura en la dosis m\'as chica que probamos ---\emph{una cabeza de cada
+        cuatro}---, de modo que la mezcla habitual de dos y dos es suficiente pero no necesaria,
+        y el precio del arreglo queda acotado por arriba en un cuarto de las cabezas.
+  \item El n\'umero principal est\'a \emph{censurado por un techo}, lo que cambia su
+        significado. Reportamos el enunciado corregido y no el halagador.
+  \item Un intento pre-registrado de escapar del techo fracas\'o bajo sus propios criterios, y
+        la predicci\'on a la que hubiera servido queda registrada como no corrida.
+\end{enumerate}
+
+\section{M\'etodo}
+
+\subsection{Pre-registro}
+
+El protocolo se congel\'o el 22-07-2026 (SHA-256 \texttt{2f8ebb82\dots}) y se deposit\'o con un
+DOI antes de entrenar cualquier condici\'on de comparaci\'on. Un pre-registro de seguimiento
+para la comparaci\'on que se reporta ac\'a se congel\'o el 23-07-2026 (SHA-256
+\texttt{0b93a36f\dots}) con una etiqueta firmada y una marca temporal del servidor anterior a
+toda corrida que gobierna. Dos enmiendas posteriores ---una que agrega la condici\'on de dosis
+m\'inima, otra que especifica la b\'usqueda de r\'egimen--- se congelaron, hashearon y anclaron
+p\'ublicamente antes de la corrida que autorizan. Un script de compuerta re-hashea todos los
+artefactos congelados y se niega a lanzar si alguno difiere.
+
+\subsection{Tarea y condiciones}
+
+El banco de pruebas es recuperaci\'on asociativa multiconsulta: una secuencia presenta $L$ pares
+clave--valor seguidos de consultas, y el modelo debe devolver el valor ligado a cada clave
+consultada. La carga $L$ es el n\'umero de pares almacenados; un conjunto de $N_K$ claves
+aporta distractores que nunca aparecen. La exactitud es la coincidencia exacta en la primera
+posici\'on candidata.
+
+Todas las condiciones comparten una arquitectura ($193\,493$ par\'ametros;
+$d_{\text{model}}=64$, cuatro cabezas, RMSNorm por cabeza) y difieren \'unicamente en qu\'e
+cabezas usan qu\'e mecanismo:
+\textbf{softmax} (cuatro cabezas \emph{softmax}), \textbf{delta} (cuatro cabezas de regla
+delta), \textbf{mix22} (dos y dos) y \textbf{mix13} (\emph{una} cabeza \emph{softmax} y tres de
+regla delta). Los conteos de par\'ametros son id\'enticos por construcci\'on; los FLOPs no lo
+son, y no pueden serlo ---\emph{softmax} es $O(n^2)$ y la regla delta es $O(n)$---, as\'i que el
+pre-registro iguala par\'ametros, reporta FLOPs y declara la direcci\'on del sesgo: las
+h\'ibridas corren con \emph{desventaja} de c\'omputo frente a \emph{softmax} puro, lo que vuelve
+conservadora cualquier confirmaci\'on.
+
+\subsection{M\'argenes, semillas y carga de evaluaci\'on}
+
+Ocho semillas por condici\'on. El margen de equivalencia no es un n\'umero fijo sino una regla
+fijada de antemano: $R_{11} = \max(.02,\ 1.5\times \text{SD entre semillas de la referencia})$,
+instanciada y registrada antes de inspeccionar cualquier condici\'on de comparaci\'on; ac\'a
+eval\'ua a $.0200$. Las diferencias se aparean por semilla. La carga de evaluaci\'on tambi\'en
+se define por regla ---la menor carga en la que la referencia cae por debajo del $95\%$---, lo
+que arroja $L=96$.
+
+Se usa en todo el trabajo un esquema de tres veredictos: \emph{diferencia}, \emph{equivalencia}
+o \emph{no concluyente}. Nunca se declara equivalencia ni diferencia por defecto.
+
+\section{Resultados}
+
+\subsection{La regla delta cae por debajo del techo; ninguna h\'ibrida lo hace}
+
+La Tabla~\ref{tab:principal} da la exactitud por carga con el presupuesto com\'un.
+
+\begin{table}[htbp]
+\centering
+\caption{Exactitud (\emph{top-1}) por carga, ocho semillas, presupuesto com\'un $N=10\,000$.}
+\label{tab:principal}
+\begin{tabular}{lcccccc}
+\toprule
+condici\'on & $L8$ & $L16$ & $L32$ & $L64$ & $L96$ & $L128$ \\
+\midrule
+delta   & 1.000 & 1.000 & 1.000 & .985 & \textbf{.921} & \textbf{.820} \\
+softmax & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 \\
+mix22   & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 \\
+mix13   & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La condici\'on de regla delta es la \'unica que abandona el techo, y lo hace de manera
+mon\'otona con la carga. En la carga de evaluaci\'on pre-registrada, la diferencia apareada
+entre la mezcla de dos y dos y la regla delta es $+.0792$, IC del $95\%$ $[+.0747, +.0838]$, que
+equivale a $4.0$ veces el margen pre-registrado de $.0200$ y es positiva en ocho de ocho
+semillas. La predicci\'on se confirma en la tabla primaria y en la secundaria, y la regla de
+discordancia pre-registrada ---que habr\'ia degradado el veredicto si ambas tablas
+discrepaban--- no se activ\'o. Una reimplementaci\'on independiente del estad\'istico, escrita
+sin importar nada del c\'odigo de an\'alisis y usando solo la biblioteca est\'andar, reproduce
+la media de forma exacta y el intervalo de confianza dentro del ruido de Monte Carlo.
+
+\subsection{Alcanza con una cabeza de cada cuatro}
+
+La condici\'on de dosis m\'inima se agreg\'o mediante una enmienda congelada que llevaba una
+tabla de interpretaci\'on escrita \emph{antes} de la corrida: cada resultado posible qued\'o
+mapeado de antemano a la afirmaci\'on que habilitar\'ia. El resultado cay\'o en la fila donde la
+h\'ibrida restituye el techo con la dosis m\'as chica probada. Su peor celda en toda la grilla
+es un d\'eficit de $1.22\times10^{-4}$ respecto de la unidad ---dentro de la tolerancia
+$R_{11}/10$ fijada para \enquote{estar en el techo}--- y su diferencia apareada contra la regla
+delta en $L96$ es $+.0792$, IC del $95\%$ $[+.0748, +.0837]$, otra vez ocho de ocho semillas.
+
+De ah\'i se siguen dos consecuencias, y la tabla congelada enuncia ambas:
+
+\begin{itemize}
+  \item La afirmaci\'on sobre \texttt{mix22} pasa a ser de \textbf{suficiencia, no de
+        necesidad}. Dos cabezas \emph{softmax} restituyen el techo, pero una tambi\'en; el
+        experimento no habilita a decir \enquote{hacen falta dos}. El costo del remedio queda
+        acotado por arriba en un cuarto de las cabezas.
+  \item \textbf{No se obtiene curva dosis--respuesta.} Los tres puntos hibridados saturan, as\'i
+        que la predicci\'on de monoton\'ia no puede evaluarse. Se reporta como no evaluable, no
+        como confirmada.
+\end{itemize}
+
+\subsection{Qu\'e significa realmente el n\'umero: censura}
+
+Es tentador reportar $+.0792$ como \enquote{la h\'ibrida supera a la regla delta por ocho
+puntos}. Esa lectura es incorrecta, y fue el pre-registro lo que la detect\'o.
+
+Todas las condiciones h\'ibridas est\'an en el techo a lo largo de la grilla entera ---la peor
+celda de \texttt{mix22} en cualquier punto es $.999512$---. Su capacidad, por lo tanto, no est\'a
+medida sino \textbf{censurada}: observamos que todav\'ia no fall\'o, no cu\'an lejos est\'a de
+fallar. Un instrumento que satura no puede informar la magnitud de aquello que lo excede.
+
+El enunciado medido es, en consecuencia, sobre la \emph{regla delta}:
+
+\begin{quote}
+La regla delta por s\'i sola cae por debajo del techo en cargas donde las condiciones h\'ibridas
+no caen.
+\end{quote}
+
+y $+.0792$ es una \textbf{cota inferior} de una diferencia cuyo valor real se desconoce y puede
+ser mucho mayor. Es una afirmaci\'on m\'as d\'ebil sobre la h\'ibrida de lo que sugiere el
+n\'umero crudo, y m\'as filosa sobre la l\'inea de base de atenci\'on lineal. Notamos, adem\'as,
+que es una afirmaci\'on distinta de las de la literatura h\'ibrida a escala, que reporta
+ganancias en tarea final en vez de una cota sobre d\'onde falla primero una l\'inea de base de
+atenci\'on lineal pura.
+
+\subsection{Predicciones secundarias}
+
+El estad\'istico descriptivo pre-registrado que ubica a la h\'ibrida entre las dos condiciones
+puras da $f = (C_3-C_2)/(C_1-C_2) = 1.001$: la h\'ibrida est\'a exactamente en el techo de
+\emph{softmax}, que es la censura de arriba dicha de otro modo.
+
+La predicci\'on sobre d\'onde comienza la degradaci\'on se confirma en sus tres partes: inicio
+en la mediana $L_0 = 64$; monoton\'ia estricta de la degradaci\'on con la carga
+($\rho = -1.000$); y decaimiento acelerado en vez de lineal ($+.0361$, IC del $95\%$
+$[+.0335, +.0390]$).
+
+La predicci\'on de una anticorrelaci\'on entre capacidad y corregibilidad es \textbf{no
+concluyente} y as\'i se reporta. Su prueba prevista no era evaluable en la carga de evaluaci\'on
+(la SD de la referencia qued\'o por debajo del umbral de usabilidad pre-registrado), de modo que
+se aplic\'o el respaldo pre-especificado, lo que vuelve la comparaci\'on cruzada entre cargas;
+la correlaci\'on resultante es $-.455$ con un intervalo de confianza que cruza el cero. Un
+diagn\'ostico pre-registrado justamente para esto descarta el confundido del punto de detenci\'on
+como explicaci\'on, y deja a la potencia estad\'istica como limitaci\'on. Con ocho semillas el
+estudio no puede resolverla.
+
+\section{La frontera no es alcanzable a esta escala}
+
+La censura de arriba tiene un remedio evidente: encontrar un r\'egimen donde la referencia tenga
+rango din\'amico y volver a correr la comparaci\'on ah\'i. La regla para elegir ese r\'egimen se
+congel\'o antes de que existiera cualquier dato de calibraci\'on. Especifica una banda objetivo
+para la exactitud de la referencia ---$[.50, .80]$, donde el borde superior es $1-10R_{11}$ y no
+una cuesti\'on de gusto---, un espacio de b\'usqueda enumerado y ordenado de dos reg\'imenes, un
+presupuesto de c\'omputo partido en dos mitades declaradas y cuatro ramas de salida exhaustivas.
+
+Se corrieron los dos escalones. El primero ($N_K=256$, $L\le128$) devolvi\'o $1.000$ en todas
+las cargas. El segundo ($N_K=512$, $L\le256$) ---el doble de claves y el doble de carga,
+reentrenado desde cero--- devolvi\'o los valores de la Tabla~\ref{tab:escalones}: sigue en el
+techo en todas partes, peor celda $.9999$.
+
+\begin{table}[htbp]
+\centering
+\caption{Exactitud de la referencia en el segundo escal\'on de calibraci\'on ($N_K=512$).}
+\label{tab:escalones}
+\begin{tabular}{lcccccccc}
+\toprule
+$L$ & 8 & 16 & 32 & 64 & 96 & 128 & 192 & 256 \\
+\midrule
+acc@1 & 1.000 & 1.000 & .9999 & 1.000 & 1.000 & 1.000 & 1.000 & .9999 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Con los dos escalones cerrados y ninguno dentro de la banda, el procedimiento de decisi\'on
+congelado emite su tercera rama: la frontera queda m\'as all\'a de lo que este presupuesto puede
+medir a este $d_{\text{model}}$. Las consecuencias estaban escritas de antemano y son
+mec\'anicas. La predicci\'on de equivalencia que requer\'ia un r\'egimen no saturado se registra
+como \textbf{no corrida ---nunca como confirmada---}, sobre la base expl\'icita de que correrla
+en un r\'egimen saturado produce un rengl\'on que no puede fallar. Reducir $d_{\text{model}}$ se
+deriva a una campa\~na futura como redise\~no documentado, porque achicarlo rompe el invariante
+de \enquote{misma arquitectura} que vuelve comparables a las campa\~nas entre s\'i.
+
+Subrayamos la asimetr\'ia que vuelve esto reportable en vez de embarazoso. La rama no se eligi\'o
+despu\'es de ver el resultado: era una de cuatro escritas antes de que existiera dato alguno de
+calibraci\'on, junto con la regla que la distingue de \enquote{se nos acab\'o el presupuesto}
+---una distinci\'on que import\'o, porque una lectura anterior de la misma evidencia habr\'ia
+declarado inalcanzable la frontera con un escal\'on todav\'ia sin correr---. Correrlo cost\'o
+diecisiete minutos de una T4.
+
+Una b\'usqueda exploratoria fuera del espacio congelado (variando $d_{\text{model}}$, reportada
+ac\'a solo para documentar por qu\'e no se prosigue) encontr\'o que el r\'egimen es degenerado y
+no meramente dif\'icil: con $d_{\text{model}}=8$ cada cabeza escribe en un estado de cuatro
+n\'umeros, y la condici\'on h\'ibrida se vuelve \emph{inestable en vez de incapaz} ---alcanza un
+pico cercano a $.52$ y despu\'es colapsa---. Una comparaci\'on ah\'i medir\'ia colapso
+num\'erico, no la hip\'otesis.
+
+\section{El libro mayor de las conveniencias}
+
+Si el aporte durable de este trabajo es el pre-registro y no el mecanismo, entonces la manera
+honesta de reportarlo es publicar lo que las reglas rechazaron, y no solo lo que permitieron.
+Listamos las decisiones en las que el protocolo congelado jug\'o en contra de nuestro inter\'es.
+
+\begin{itemize}
+  \item \textbf{Hubo que degradar un titular tentador.} \enquote{La h\'ibrida le gana a la regla
+        delta por ocho puntos} pas\'o a \enquote{la regla delta cae donde las h\'ibridas no, por
+        al menos ocho puntos}, porque la h\'ibrida estaba censurada.
+  \item \textbf{Una afirmaci\'on de necesidad se volvi\'o de suficiencia} cuando funcion\'o la
+        dosis m\'inima, bajo una tabla de interpretaci\'on escrita antes de la corrida.
+  \item \textbf{Una predicci\'on se retir\'o en vez de reportarse.} Una regla de detenci\'on que
+        hab\'iamos propuesto habr\'ia frenado el entrenamiento mientras el modelo todav\'ia
+        mejoraba; se retir\'o y se reemplaz\'o por una regla basada en potencia, declarada no
+        retroactiva.
+  \item \textbf{Una enmienda que eximia a una condici\'on se reescribi\'o} cuando una
+        auditor\'ia encontr\'o que su umbral exclu\'ia justamente a la condici\'on para la que
+        estaba escrita.
+  \item \textbf{Un resultado no concluyente sigui\'o siendo no concluyente.} La predicci\'on de
+        capacidad--corregibilidad pod\'ia haberse reportado como tendencia; su intervalo cruza el
+        cero, as\'i que se reporta con potencia insuficiente.
+  \item \textbf{Se retir\'o la defensa de un resguardo} cuando se vio que comparaba un
+        desplazamiento entre reg\'imenes contra ruido dentro del r\'egimen, y se la reemplaz\'o
+        por una defensa medida.
+\end{itemize}
+
+Vale registrar otras dos mediciones porque inciden en c\'omo deber\'ian reportarse estas
+comparaciones. Primero, un criterio interno de detenci\'on ---congelado con un DOI antes de
+recolectar datos--- result\'o luego indetectable en principio con la raz\'on se\~nal-ruido
+alcanzada \parencite{speranza2026stopping}. Segundo, cambiar el \emph{backend} de
+c\'omputo (CPU frente a una GPU T4), manteniendo fijos semilla, datos y c\'odigo, mueve la
+exactitud de validaci\'on alrededor del $30\%$ del margen de decisi\'on en el r\'egimen tard\'io
+de entrenamiento. Los estudios que reportan \enquote{media $\pm$ SD sobre $N$ semillas} omiten un
+t\'ermino de orden comparable.
+
+\section{Limitaciones}
+
+La censura es la principal: la magnitud de la ventaja h\'ibrida no est\'a medida, solo acotada
+por abajo, y la calibraci\'on estableci\'o que ning\'un r\'egimen accesible remueve el techo en
+esta tarea a esta escala. El resultado, por lo tanto, se traslada a las otras dos tareas del
+programa solo como hip\'otesis ---la regla congelada que gobierna la b\'usqueda de r\'egimen lo
+dice expl\'icitamente, ya que esas tareas tienen su propio nivel de azar y su propia dificultad---.
+
+La predicci\'on de anticorrelaci\'on tiene potencia insuficiente con ocho semillas. El
+presupuesto com\'un de entrenamiento es declarado y no derivado: la condici\'on de regla delta no
+hab\'ia convergido en el tope pre-registrado en tres de ocho semillas, as\'i que se reporta como
+presupuesto fijo declarado, lo que sesga en contra de esa condici\'on y es por lo tanto
+conservador para la predicci\'on confirmada. Por \'ultimo, este es un estudio de escala peque\~na
+($\sim$$10^5$ par\'ametros, tarea sint\'etica): cuantifica un mecanismo en condiciones
+controladas y no establece ganancias en tarea final a escala, para lo cual el lector debe
+remitirse a la literatura citada m\'as arriba.
+
+\section*{Pr\'acticas abiertas}
+
+El protocolo congelado est\'a depositado con un DOI (10.5281/zenodo.21495252). El pre-registro
+de seguimiento y todas las enmiendas son p\'ublicos, hasheados, firmados y con marca temporal,
+cada uno anclado antes de la corrida que gobierna. Los resultados crudos por semilla, el
+c\'odigo de an\'alisis, una reimplementaci\'on independiente del estad\'istico principal y los
+registros de calibraci\'on est\'an disponibles en
+\url{https://github.com/SperanzaMax/telar-ligamento}. Cada n\'umero de este art\'iculo es
+reproducible a partir de los artefactos depositados; los scripts de an\'alisis corren en CPU.
+
+\printbibliography
+
+\end{document}
