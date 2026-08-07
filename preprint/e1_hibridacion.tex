@@ -18,7 +18,12 @@ Replication with a Censored Effect and an Unreachable Frontier}
 \author{Maximiliano Speranza}
 \affiliation{Independent Researcher, Argentina}
 
-\authornote{\addORCIDlink{Maximiliano Speranza}{0009-0005-0413-8554}
+\authornote{Maximiliano Speranza \quad ORCID iD:
+\href{https://orcid.org/0009-0005-0413-8554}{0009-0005-0413-8554}
+% El numero va COMO TEXTO a proposito. apa7 define \addORCIDlink dos veces y el
+% \renewcommand posterior deja el identificador solo dentro del hipervinculo: en el PDF
+% se ve el logo, nunca el numero. Verificado sobre el PDF compilado.
+\par
 This work was carried out independently, without institutional affiliation, supervision, or
 funding. The author is an undergraduate student of the University Technical Degree in
 Programming (\emph{Tecnicatura Universitaria en Programaci\'on}, TUP) at Universidad
@@ -132,7 +137,7 @@ A three-verdict scheme is used throughout: \emph{difference}, \emph{equivalence}
 
 Table~\ref{tab:main} gives accuracy by load at the common budget.
 
-\begin{table}[htbp]
+\begin{table*}[htbp]
 \centering
 \caption{Top-1 accuracy by load, eight seeds, common budget $N=10{,}000$.}
 \label{tab:main}
@@ -146,7 +151,7 @@ mix22   & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 \\
 mix13   & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 The delta-rule condition is the only one that leaves the ceiling, and it does so
 monotonically with load. At the pre-registered evaluation load the paired difference between
@@ -233,7 +238,7 @@ second ($N_K=512$, $L\le256$)---double the key pool and double the load, retrain
 scratch---returned the values in Table~\ref{tab:rungs}: still at ceiling everywhere, worst cell
 $.9999$.
 
-\begin{table}[htbp]
+\begin{table*}[htbp]
 \centering
 \caption{Reference accuracy on the second calibration rung ($N_K=512$).}
 \label{tab:rungs}
@@ -244,7 +249,7 @@ $L$ & 8 & 16 & 32 & 64 & 96 & 128 & 192 & 256 \\
 acc@1 & 1.000 & 1.000 & .9999 & 1.000 & 1.000 & 1.000 & 1.000 & .9999 \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 With both rungs closed and neither meeting the band, the frozen decision procedure emits its
 third branch: the frontier lies beyond what this budget can measure at this $d_{\text{model}}$.

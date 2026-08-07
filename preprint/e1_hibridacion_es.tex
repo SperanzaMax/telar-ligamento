@@ -21,7 +21,12 @@ una replicaci\'on pre-registrada con un efecto censurado y una frontera inalcanz
 \author{Maximiliano Speranza}
 \affiliation{Investigador independiente, Argentina}
 
-\authornote{\addORCIDlink{Maximiliano Speranza}{0009-0005-0413-8554}
+\authornote{Maximiliano Speranza \quad ORCID iD:
+\href{https://orcid.org/0009-0005-0413-8554}{0009-0005-0413-8554}
+% El numero va COMO TEXTO a proposito. apa7 define \addORCIDlink dos veces y el
+% \renewcommand posterior deja el identificador solo dentro del hipervinculo: en el PDF
+% se ve el logo, nunca el numero. Verificado sobre el PDF compilado.
+\par
 Este trabajo se realiz\'o de manera independiente, sin afiliaci\'on institucional, supervisi\'on
 ni financiamiento. El autor es estudiante de la Tecnicatura Universitaria en Programaci\'on
 (TUP) de la Universidad Tecnol\'ogica Nacional (UTN), Argentina, y egresado de su Diplomatura
@@ -144,7 +149,7 @@ o \emph{no concluyente}. Nunca se declara equivalencia ni diferencia por defecto
 
 La Tabla~\ref{tab:principal} da la exactitud por carga con el presupuesto com\'un.
 
-\begin{table}[htbp]
+\begin{table*}[htbp]
 \centering
 \caption{Exactitud (\emph{top-1}) por carga, ocho semillas, presupuesto com\'un $N=10\,000$.}
 \label{tab:principal}
@@ -158,7 +163,7 @@ mix22   & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 \\
 mix13   & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 La condici\'on de regla delta es la \'unica que abandona el techo, y lo hace de manera
 mon\'otona con la carga. En la carga de evaluaci\'on pre-registrada, la diferencia apareada
@@ -250,7 +255,7 @@ las cargas. El segundo ($N_K=512$, $L\le256$) ---el doble de claves y el doble d
 reentrenado desde cero--- devolvi\'o los valores de la Tabla~\ref{tab:escalones}: sigue en el
 techo en todas partes, peor celda $.9999$.
 
-\begin{table}[htbp]
+\begin{table*}[htbp]
 \centering
 \caption{Exactitud de la referencia en el segundo escal\'on de calibraci\'on ($N_K=512$).}
 \label{tab:escalones}
@@ -261,7 +266,7 @@ $L$ & 8 & 16 & 32 & 64 & 96 & 128 & 192 & 256 \\
 acc@1 & 1.000 & 1.000 & .9999 & 1.000 & 1.000 & 1.000 & 1.000 & .9999 \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 Con los dos escalones cerrados y ninguno dentro de la banda, el procedimiento de decisi\'on
 congelado emite su tercera rama: la frontera queda m\'as all\'a de lo que este presupuesto puede
