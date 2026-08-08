@@ -212,3 +212,32 @@ implementar los generadores (antes de correr una sola semilla — el orden corre
 evaluación de E1) y la corrida de C1. NO bloquea T2 (correctabilidad, L≤64), ni T3/T4/T5, ni la
 medición de ruido/márgenes de las otras familias (P2.x, P3.x, P4.x). Se puede avanzar con el resto de
 la infraestructura mientras se decide D-001.
+
+## D-007 — El campo `veredicto` del registro de E-b dice R4, y el veredicto real es R3
+
+**2026-08-08, hallada en la revisión en frío del paper.**
+
+`resultados/calibracion/calibracion_rbanda_E-b.json` lleva escrito, en su campo `veredicto`,
+el texto de **R4** («DECISIÓN SUSPENDIDA: el tope se agotó con la bisección ABIERTA … Leer R4
+como R3 sería convertir una restricción de crédito en un hallazgo»). Ese texto es un remanente
+del estado anterior a la corrida: **contradice al propio archivo**, que en el mismo objeto
+registra `biseccion_cerrada: true` para E-b.
+
+**El veredicto de la escalera no vive en ese campo.** Lo emite `decidir_escalera.py` cuando se
+lo alimenta con los **dos** registros, y su salida —verificada de nuevo hoy— es:
+
+```
+R3 — FRONTERA INALCANZABLE: ningún escalón cumple la banda y la bisección cerró en ambos.
+rama=R3 · régimen elegido=None
+```
+
+**Qué se hace:** nada sobre el artefacto. El JSON es un registro de corrida y no se toca; el
+campo quedó mal escrito pero ningún número depende de él. Se documenta acá porque un lector
+que abra ese archivo antes que el informe va a leer un R4 y sospechar que el paper leyó R4
+como R3 — que es exactamente lo que ese texto prohíbe. No ocurrió: el R3 sale del decisor con
+la escalera completa, y `CIERRE_CALIBRACION_20260806.md` ya lo dejaba reproducible con el
+comando exacto.
+
+**Riesgo residual:** si en una campaña futura se lee ese campo por programa en vez de correr el
+decisor, se obtiene el veredicto equivocado. Conviene que el runner deje de escribirlo, o que
+lo escriba como `veredicto_del_escalon` para que no se confunda con el de la escalera.

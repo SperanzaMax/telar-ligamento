@@ -233,7 +233,7 @@ outcome branches.
 Both rungs were run. The first ($N_K=256$, $L\le128$) returned $1.000$ at every load. The
 second ($N_K=512$, $L\le256$)---double the key pool and double the load, retrained from
 scratch---returned the values in Table~\ref{tab:rungs}: still at ceiling everywhere, worst cell
-$.9999$.
+$.9999$ (at $L=32$).
 
 \begin{table}[htbp]
 \centering
@@ -243,7 +243,7 @@ $.9999$.
 \toprule
 $L$ & 8 & 16 & 32 & 64 & 96 & 128 & 192 & 256 \\
 \midrule
-acc@1 & 1.000 & 1.000 & .9999 & 1.000 & 1.000 & 1.000 & 1.000 & .9999 \\
+acc@1 & 1.0000 & 1.0000 & .9999 & 1.0000 & 1.0000 & 1.0000 & 1.0000 & 1.0000 \\
 \bottomrule
 \end{tabular}
 \end{table}
